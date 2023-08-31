@@ -1,0 +1,68 @@
+{
+  "id" : 0,
+  "fields" : [ {
+    "id" : 0,
+    "name" : "point_id",
+    "type" : "STRING NOT NULL"
+  }, {
+    "id" : 1,
+    "name" : "version",
+    "type" : "INT NOT NULL"
+  }, {
+    "id" : 2,
+    "name" : "version_info",
+    "type" : "STRING"
+  }, {
+    "id" : 3,
+    "name" : "address",
+    "type" : "STRING"
+  }, {
+    "id" : 4,
+    "name" : "lon",
+    "type" : "STRING"
+  }, {
+    "id" : 5,
+    "name" : "lat",
+    "type" : "STRING"
+  }, {
+    "id" : 6,
+    "name" : "operator",
+    "type" : "STRING"
+  }, {
+    "id" : 7,
+    "name" : "orders",
+    "type" : "INT"
+  }, {
+    "id" : 8,
+    "name" : "battery",
+    "type" : "STRING"
+  }, {
+    "id" : 9,
+    "name" : "create_time",
+    "type" : "TIMESTAMP(0)"
+  }, {
+    "id" : 10,
+    "name" : "update_time",
+    "type" : "TIMESTAMP(0)"
+  }, {
+    "id" : 11,
+    "name" : "ac_guns",
+    "type" : "INT"
+  }, {
+    "id" : 12,
+    "name" : "pre_gun_charge",
+    "type" : "STRING"
+  } ],
+  "highestFieldId" : 12,
+  "partitionKeys" : [ ],
+  "primaryKeys" : [ ],
+  "options" : {
+    "bucket" : "2",
+    "auto-create" : "true",
+    "path" : "oss://strategy-map/paimon/default.db/no_primary_key_table",
+    "changelog-producer" : "input",
+    "manifest.format" : "avro",
+    "file.format" : "parquet",
+    "type" : "paimon"
+  }
+}
