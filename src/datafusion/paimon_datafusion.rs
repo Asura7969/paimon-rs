@@ -8,10 +8,15 @@ use datafusion::{
 use datafusion_cli::object_storage::{get_oss_object_store_builder, get_s3_object_store_builder};
 use datafusion_common::DataFusionError;
 use datafusion_expr::CreateExternalTable;
+#[cfg(feature = "hdfs")]
+use datafusion_objectstore_hdfs::object_store::hdfs::HadoopFileSystem;
 use object_store::{local::LocalFileSystem, ObjectStore};
 use url::Url;
 
-use super::paimon::table::{open_table, open_table_with_storage_options};
+use super::paimon::{
+    error::PaimonError,
+    table::{open_table, open_table_with_storage_options},
+};
 
 pub struct PaimonTableFactory {}
 
@@ -53,6 +58,7 @@ async fn create_external_table(
             let builder = get_oss_object_store_builder(url, cmd)?;
             Arc::new(builder.build()?) as Arc<dyn ObjectStore>
         }
+        "hdfs" => try_hdfs(url).expect("don't create hdfs object store"),
         "file" => {
             #[cfg(windows)]
             {
@@ -84,6 +90,26 @@ async fn create_external_table(
     state.runtime_env().register_object_store(url, store);
 
     Ok(())
+}
+
+#[cfg(feature = "hdfs")]
+fn try_hdfs(url: &Url) -> Result<Arc<dyn ObjectStore>, PaimonError> {
+    Ok(Arc::new(
+        HadoopFileSystem::new(url.as_ref()).ok_or_else(|| {
+            PaimonError::Generic(format!(
+                "failed to create HadoopFileSystem for {}",
+                url.as_ref()
+            ))
+        })? as Arc<dyn ObjectStore>,
+    ))
+}
+
+#[cfg(not(feature = "hdfs"))]
+fn try_hdfs(url: &Url) -> Result<Arc<dyn ObjectStore>, PaimonError> {
+    Err(PaimonError::MissingFeature {
+        feature: "hdfs",
+        url: url.as_ref().into(),
+    })
 }
 
 #[allow(unused_imports)]
@@ -120,14 +146,8 @@ mod tests {
             .collect()
             .await?;
 
-        arrow_print_batches(&batches).unwrap();
-
-        // let batch = &batches[0];
-
-        // assert_eq!(
-        //     batch.column(0).as_ref(),
-        //     Arc::new(Int32Array::from(vec![4, 5, 20, 20])).as_ref(),
-        // );
+        // arrow_print_batches(&batches).unwrap();
+        assert!(arrow_print_batches(&batches).is_ok());
         Ok(())
     }
 }

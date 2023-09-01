@@ -24,4 +24,15 @@ pub enum PaimonError {
 
     #[error("parser error")]
     ParserError(#[from] ParserError),
+
+    #[error("Generic DeltaTable error: {0}")]
+    Generic(String),
+
+    #[error("Paimon-rs must be build with feature '{feature}' to support loading from: {url}.")]
+    MissingFeature {
+        /// Name of the missing feature
+        feature: &'static str,
+        /// Storage location url
+        url: String,
+    },
 }

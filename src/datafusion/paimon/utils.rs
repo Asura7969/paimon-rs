@@ -3,9 +3,9 @@ use std::sync::Arc;
 use chrono::Local;
 use datafusion::arrow::datatypes::{DataType, TimeUnit};
 
+use crate::datafusion::paimon::error::PaimonError;
 use nom::{bytes::complete::take_until, error::ErrorKind, IResult};
 use object_store::DynObjectStore;
-use crate::datafusion::paimon::error::PaimonError;
 
 pub(crate) async fn read_to_string(
     storage: &Arc<DynObjectStore>,
@@ -119,16 +119,10 @@ mod tests {
     #[test]
     fn extract_num_test() {
         let input = "STRING(10) NOT NULL";
-        assert_eq!(
-            extract_num(input),
-            Ok(("STRING", (10, None)))
-        );
+        assert_eq!(extract_num(input), Ok(("STRING", (10, None))));
 
         let input = "STRING(20)";
-        assert_eq!(
-            extract_num(input),
-            Ok(("STRING", (20, None)))
-        );
+        assert_eq!(extract_num(input), Ok(("STRING", (20, None))));
 
         let input = "STRING";
         assert_eq!(
@@ -139,9 +133,6 @@ mod tests {
             )))
         );
         let input = "DECIMAL(1, 38)";
-        assert_eq!(
-            extract_num(input),
-            Ok(("DECIMAL", (1, Some(38))))
-        );
+        assert_eq!(extract_num(input), Ok(("DECIMAL", (1, Some(38)))));
     }
 }

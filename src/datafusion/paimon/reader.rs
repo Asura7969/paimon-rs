@@ -175,7 +175,10 @@ mod tests {
     #[tokio::test]
     async fn async_read_parquet_files_test() -> Result<(), PaimonError> {
         let path = test_paimonm_table_path("many_pk_table");
-        let path = format!("{}/bucket-0/data-a53acd62-0d99-43d6-8ffe-a76ac3b719d9-1.parquet", path);
+        let path = format!(
+            "{}/bucket-0/data-a53acd62-0d99-43d6-8ffe-a76ac3b719d9-1.parquet",
+            path
+        );
 
         let file = File::open(path).await.unwrap();
 
