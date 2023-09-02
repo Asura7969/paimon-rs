@@ -30,7 +30,7 @@ arrow-schema = "43.0.0"
 arrow-array = "43.0.0"
 arrow-select = "43.0.0"
 
-parquet = {version= "43.0.0", features = ["async"]}
+parquet = {version= "43.0.0", features = ["arrow", "async", "object_store"]}
 tempfile = "3.5.0"
 arrow-cast = { version = "43.0.0", features = ["comfy-table", "prettyprint"] }
 #turmoil = "0.5.6"

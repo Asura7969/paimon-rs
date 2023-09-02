@@ -1,20 +1,26 @@
-use std::sync::Arc;
-
-use apache_avro::{from_value, Reader as AvroReader};
-use datafusion::datasource::listing::{ListingTableUrl, PartitionedFile};
-use datafusion::datasource::physical_plan::{FileScanConfig, ParquetExec};
-use datafusion_common::Statistics;
-use datafusion_expr::Expr;
-use nom::AsBytes;
-use object_store::path::Path;
-use serde::{Deserialize, Serialize};
-
-use crate::datafusion::paimon::ManifestFileMeta;
+use std::ops::Range;
+use std::sync::{Arc, Mutex};
 
 use super::error::PaimonError;
 use super::manifest::ManifestEntry;
 use super::{add_system_fields, PaimonSchema};
+use crate::datafusion::paimon::ManifestFileMeta;
+use apache_avro::{from_value, Reader as AvroReader};
+use bytes::Bytes;
+use datafusion::datasource::listing::{ListingTableUrl, PartitionedFile};
+use datafusion::datasource::physical_plan::{FileScanConfig, ParquetExec};
+use datafusion_common::Statistics;
+use datafusion_expr::Expr;
+use futures::future::{BoxFuture, FutureExt};
+use futures::TryStreamExt;
+use nom::AsBytes;
+use object_store::path::Path;
 use object_store::{DynObjectStore, ObjectMeta};
+use parquet::arrow::async_reader::AsyncFileReader;
+use parquet::arrow::{ParquetRecordBatchStreamBuilder, ProjectionMask};
+use parquet::file::footer::parse_metadata;
+use parquet::file::metadata::ParquetMetaData;
+use serde::{Deserialize, Serialize};
 pub enum FileFormat {
     #[allow(dead_code)]
     Parquet,
@@ -41,7 +47,7 @@ pub async fn manifest_list(
 ) -> Result<Vec<ManifestFileMeta>, PaimonError> {
     match format {
         FileFormat::Avro => read_avro::<ManifestFileMeta>(storage, location).await,
-        FileFormat::Parquet => unimplemented!(),
+        FileFormat::Parquet => read_parquet_bytes::<ManifestFileMeta>(storage, location).await,
         FileFormat::Orc => unimplemented!(),
     }
 }
@@ -59,11 +65,61 @@ pub async fn manifest(
     }
 }
 
+#[derive(Clone)]
+struct ParquetBytesReader {
+    data: Bytes,
+    metadata: Arc<ParquetMetaData>,
+    requests: Arc<Mutex<Vec<Range<usize>>>>,
+}
+
+impl AsyncFileReader for ParquetBytesReader {
+    fn get_bytes(&mut self, range: Range<usize>) -> BoxFuture<'_, parquet::errors::Result<Bytes>> {
+        self.requests.lock().unwrap().push(range.clone());
+        futures::future::ready(Ok(self.data.slice(range))).boxed()
+    }
+
+    fn get_metadata(&mut self) -> BoxFuture<'_, parquet::errors::Result<Arc<ParquetMetaData>>> {
+        futures::future::ready(Ok(self.metadata.clone())).boxed()
+    }
+}
+
+async fn read_parquet_bytes<T: Serialize + for<'a> Deserialize<'a>>(
+    storage: &Arc<DynObjectStore>,
+    location: &Path,
+) -> Result<Vec<T>, PaimonError> {
+    let bytes = storage.get(location).await.unwrap().bytes().await.unwrap();
+    let metadata = parse_metadata(&bytes).unwrap();
+    let metadata = Arc::new(metadata);
+
+    let async_reader = ParquetBytesReader {
+        data: bytes,
+        metadata,
+        requests: Default::default(),
+    };
+
+    let _requests = async_reader.requests.clone();
+    let builder = ParquetRecordBatchStreamBuilder::new(async_reader)
+        .await
+        .unwrap();
+
+    let mask = ProjectionMask::leaves(builder.parquet_schema(), 0..builder.schema().fields.len());
+    let stream = builder
+        .with_projection(mask.clone())
+        .with_batch_size(1024)
+        .build()
+        .unwrap();
+
+    let _arrow_arraybatches: Vec<_> = stream.try_collect().await.unwrap();
+    // for elem in batches {
+    //     &elem.into()
+    // }
+    todo!()
+}
+
 async fn read_avro<T: Serialize + for<'a> Deserialize<'a>>(
     storage: &Arc<DynObjectStore>,
     location: &Path,
 ) -> Result<Vec<T>, PaimonError> {
-    // TODO: remote read, such as OSS, HDFS, etc.
     let bytes = storage.get(location).await.unwrap().bytes().await.unwrap();
     // let r: fs::File = fs::File::open(path)?;
     let reader = AvroReader::new(bytes.as_bytes())?;
