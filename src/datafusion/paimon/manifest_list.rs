@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use object_store::{path::Path, DynObjectStore};
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 
 use super::{
     error::PaimonError, manifest::ManifestEntry, reader::manifest, PaimonSchema, PartitionStat,
@@ -33,5 +34,13 @@ impl ManifestFileMeta {
     ) -> Result<Vec<ManifestEntry>, PaimonError> {
         let path = format!("/manifest/{}", self.file_name);
         manifest(storage, &Path::from(path), &schema.get_manifest_format()).await
+    }
+}
+
+impl From<&Map<String, Value>> for ManifestFileMeta {
+    fn from(map: &Map<String, Value>) -> Self {
+        let serialized = serde_json::to_string(map).unwrap();
+        let deserialized: ManifestFileMeta = serde_json::from_str(&serialized).unwrap();
+        deserialized
     }
 }

@@ -1,6 +1,7 @@
 use chrono::{TimeZone, Utc};
 use datafusion::datasource::listing::ListingTableUrl;
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 
 use super::PartitionStat;
 use object_store::path::Path;
@@ -36,6 +37,14 @@ impl ManifestEntry {
             }
             _ => None,
         }
+    }
+}
+
+impl From<&Map<String, Value>> for ManifestEntry {
+    fn from(map: &Map<String, Value>) -> Self {
+        let serialized = serde_json::to_string(map).unwrap();
+        let deserialized: ManifestEntry = serde_json::from_str(&serialized).unwrap();
+        deserialized
     }
 }
 

@@ -21,6 +21,7 @@ use parquet::arrow::{ParquetRecordBatchStreamBuilder, ProjectionMask};
 use parquet::file::footer::parse_metadata;
 use parquet::file::metadata::ParquetMetaData;
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 pub enum FileFormat {
     #[allow(dead_code)]
     Parquet,
@@ -46,7 +47,7 @@ pub async fn manifest_list(
     format: &FileFormat,
 ) -> Result<Vec<ManifestFileMeta>, PaimonError> {
     match format {
-        FileFormat::Avro => read_avro::<ManifestFileMeta>(storage, location).await,
+        FileFormat::Avro => read_avro_bytes::<ManifestFileMeta>(storage, location).await,
         FileFormat::Parquet => read_parquet_bytes::<ManifestFileMeta>(storage, location).await,
         FileFormat::Orc => unimplemented!(),
     }
@@ -59,8 +60,8 @@ pub async fn manifest(
     format: &FileFormat,
 ) -> Result<Vec<ManifestEntry>, PaimonError> {
     match format {
-        FileFormat::Avro => read_avro::<ManifestEntry>(storage, location).await,
-        FileFormat::Parquet => unimplemented!(),
+        FileFormat::Avro => read_avro_bytes::<ManifestEntry>(storage, location).await,
+        FileFormat::Parquet => read_parquet_bytes::<ManifestEntry>(storage, location).await,
         FileFormat::Orc => unimplemented!(),
     }
 }
@@ -83,12 +84,15 @@ impl AsyncFileReader for ParquetBytesReader {
     }
 }
 
-async fn read_parquet_bytes<T: Serialize + for<'a> Deserialize<'a>>(
+async fn read_parquet_bytes<T>(
     storage: &Arc<DynObjectStore>,
     location: &Path,
-) -> Result<Vec<T>, PaimonError> {
-    let bytes = storage.get(location).await.unwrap().bytes().await.unwrap();
-    let metadata = parse_metadata(&bytes).unwrap();
+) -> Result<Vec<T>, PaimonError>
+where
+    T: Serialize + for<'a> Deserialize<'a> + for<'a> From<&'a Map<String, Value>>,
+{
+    let bytes = storage.get(location).await?.bytes().await?;
+    let metadata = parse_metadata(&bytes)?;
     let metadata = Arc::new(metadata);
 
     let async_reader = ParquetBytesReader {
@@ -97,7 +101,7 @@ async fn read_parquet_bytes<T: Serialize + for<'a> Deserialize<'a>>(
         requests: Default::default(),
     };
 
-    let _requests = async_reader.requests.clone();
+    // let _requests = async_reader.requests.clone();
     let builder = ParquetRecordBatchStreamBuilder::new(async_reader)
         .await
         .unwrap();
@@ -106,21 +110,27 @@ async fn read_parquet_bytes<T: Serialize + for<'a> Deserialize<'a>>(
     let stream = builder
         .with_projection(mask.clone())
         .with_batch_size(1024)
-        .build()
-        .unwrap();
+        .build()?;
 
-    let _arrow_arraybatches: Vec<_> = stream.try_collect().await.unwrap();
-    // for elem in batches {
-    //     &elem.into()
-    // }
-    todo!()
+    let batches: Vec<_> = stream.try_collect().await?;
+    arrow::util::pretty::print_batches(&batches).unwrap();
+
+    let json_rows = batches
+        .iter()
+        .map(|batch| arrow_json::writer::record_batches_to_json_rows(&[batch]).unwrap())
+        .flatten()
+        .collect::<Vec<Map<String, Value>>>();
+
+    let list = json_rows.iter().map(|row| row.into()).collect::<Vec<T>>();
+
+    Ok(list)
 }
 
-async fn read_avro<T: Serialize + for<'a> Deserialize<'a>>(
+async fn read_avro_bytes<T: Serialize + for<'a> Deserialize<'a>>(
     storage: &Arc<DynObjectStore>,
     location: &Path,
 ) -> Result<Vec<T>, PaimonError> {
-    let bytes = storage.get(location).await.unwrap().bytes().await.unwrap();
+    let bytes = storage.get(location).await?.bytes().await?;
     // let r: fs::File = fs::File::open(path)?;
     let reader = AvroReader::new(bytes.as_bytes())?;
     // let writer_schema = reader.writer_schema().clone();
@@ -129,7 +139,7 @@ async fn read_avro<T: Serialize + for<'a> Deserialize<'a>>(
     let mut manifestlist: Vec<T> = Vec::new();
 
     for value in reader {
-        let record = value.unwrap();
+        let record = value?;
         // println!("{:?}", record);
         let meta: T = from_value::<T>(&record)?;
         manifestlist.push(meta);
@@ -211,9 +221,27 @@ mod tests {
     use tokio::fs::File;
 
     #[tokio::test]
-    async fn read_manifest_test() -> Result<(), PaimonError> {
+    async fn read_parquet_manifest_test() -> Result<(), PaimonError> {
+        // let (_url, storage) = test_local_store("avro_parquet_table").await;
+        // let manifest = read_parquet_bytes::<ManifestEntry>(
+        //     &storage,
+        //     &Path::from_iter(vec![
+        //         "manifest",
+        //         "manifest-90cbba21-37fe-4e9e-ba86-71e680b87955-1",
+        //     ]),
+        // )
+        // .await?;
+
+        // let serialized = serde_json::to_string(&manifest).unwrap();
+        // println!("{}", serialized);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn read_avro_manifest_test() -> Result<(), PaimonError> {
         let (_url, storage) = test_local_store("ods_mysql_paimon_points_5").await;
-        let manifest = read_avro::<ManifestEntry>(
+        let manifest = read_avro_bytes::<ManifestEntry>(
             &storage,
             &Path::from_iter(vec![
                 "manifest",

@@ -1,4 +1,5 @@
 use datafusion_sql::sqlparser::parser::ParserError;
+use object_store::Error as ObjectStoreError;
 use parquet::errors::ParquetError;
 use thiserror::Error;
 
@@ -34,5 +35,12 @@ pub enum PaimonError {
         feature: &'static str,
         /// Storage location url
         url: String,
+    },
+
+    #[error("Failed to read paimon log object: {}", .source)]
+    ObjectStore {
+        /// Storage error details when reading the delta log object failed.
+        #[from]
+        source: ObjectStoreError,
     },
 }
