@@ -2,6 +2,7 @@ use std::ops::Range;
 use std::sync::{Arc, Mutex};
 
 use super::error::PaimonError;
+use super::json_util::record_batches_to_json_rows;
 use super::manifest::ManifestEntry;
 use super::{add_system_fields, PaimonSchema};
 use crate::datafusion::paimon::ManifestFileMeta;
@@ -113,12 +114,10 @@ where
         .build()?;
 
     let batches: Vec<_> = stream.try_collect().await?;
-    arrow::util::pretty::print_batches(&batches).unwrap();
 
     let json_rows = batches
         .iter()
-        .map(|batch| arrow_json::writer::record_batches_to_json_rows(&[batch]).unwrap())
-        .flatten()
+        .flat_map(|batch| record_batches_to_json_rows(&[batch]).unwrap())
         .collect::<Vec<Map<String, Value>>>();
 
     let list = json_rows.iter().map(|row| row.into()).collect::<Vec<T>>();
@@ -222,18 +221,18 @@ mod tests {
 
     #[tokio::test]
     async fn read_parquet_manifest_test() -> Result<(), PaimonError> {
-        // let (_url, storage) = test_local_store("avro_parquet_table").await;
-        // let manifest = read_parquet_bytes::<ManifestEntry>(
-        //     &storage,
-        //     &Path::from_iter(vec![
-        //         "manifest",
-        //         "manifest-90cbba21-37fe-4e9e-ba86-71e680b87955-1",
-        //     ]),
-        // )
-        // .await?;
+        let (_url, storage) = test_local_store("avro_parquet_table").await;
+        let manifest = read_parquet_bytes::<ManifestEntry>(
+            &storage,
+            &Path::from_iter(vec![
+                "manifest",
+                "manifest-90cbba21-37fe-4e9e-ba86-71e680b87955-1",
+            ]),
+        )
+        .await?;
 
-        // let serialized = serde_json::to_string(&manifest).unwrap();
-        // println!("{}", serialized);
+        let serialized = serde_json::to_string(&manifest).unwrap();
+        println!("{}", serialized);
 
         Ok(())
     }

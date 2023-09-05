@@ -52,29 +52,29 @@ impl From<&Map<String, Value>> for ManifestEntry {
 pub struct DataFileMeta {
     #[serde(rename = "_FILE_NAME")]
     pub file_name: String,
-    #[serde(rename = "_FILE_SIZE")]
+    #[serde(rename = "_FILE_SIZE", default)]
     pub file_size: i64,
-    #[serde(rename = "_ROW_COUNT")]
+    #[serde(rename = "_ROW_COUNT", default)]
     pub row_count: i64,
-    #[serde(rename = "_MIN_KEY", with = "serde_bytes")]
+    #[serde(rename = "_MIN_KEY", with = "serde_bytes", default)]
     pub min_key: Vec<u8>,
-    #[serde(rename = "_MAX_KEY", with = "serde_bytes")]
+    #[serde(rename = "_MAX_KEY", with = "serde_bytes", default)]
     pub max_key: Vec<u8>,
-    #[serde(rename = "_KEY_STATS")]
+    #[serde(rename = "_KEY_STATS", default)]
     pub key_stats: Option<PartitionStat>,
-    #[serde(rename = "_VALUE_STATS")]
+    #[serde(rename = "_VALUE_STATS", default)]
     pub value_stats: Option<PartitionStat>,
-    #[serde(rename = "_MIN_SEQUENCE_NUMBER")]
+    #[serde(rename = "_MIN_SEQUENCE_NUMBER", default)]
     pub min_sequence_number: i64,
-    #[serde(rename = "_MAX_SEQUENCE_NUMBER")]
+    #[serde(rename = "_MAX_SEQUENCE_NUMBER", default)]
     pub max_sequence_number: i64,
-    #[serde(rename = "_SCHEMA_ID")]
+    #[serde(rename = "_SCHEMA_ID", default)]
     pub schema_id: i64,
-    #[serde(rename = "_LEVEL")]
+    #[serde(rename = "_LEVEL", default)]
     pub level: i32,
-    #[serde(rename = "_EXTRA_FILES")]
+    #[serde(rename = "_EXTRA_FILES", default)]
     pub extra_files: Vec<String>,
-    #[serde(rename = "_CREATION_TIME")]
+    #[serde(rename = "_CREATION_TIME", default)]
     pub creation_time: i64,
 }
 
