@@ -61,7 +61,7 @@ impl TableProvider for PaimonProvider {
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let mut paimon_schema = self.schema.clone().unwrap();
-        let entries = self.snapshot.base(&self.storage).await.unwrap();
+        let entries = self.snapshot.all(&self.storage).await.unwrap();
 
         let new_projection = if let Some(idxes) = projection {
             // 表的主键个数 + seq_num + RowKind
