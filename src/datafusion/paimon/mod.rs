@@ -109,25 +109,34 @@ impl Field {
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub struct PartitionStat {
-    #[serde(rename = "_MIN_VALUES", with = "serde_bytes")]
+    #[serde(rename = "_MIN_VALUES", with = "serde_bytes", default)]
     min_values: Vec<u8>,
-    #[serde(rename = "_MAX_VALUES", with = "serde_bytes")]
+    #[serde(rename = "_MAX_VALUES", with = "serde_bytes", default)]
     max_values: Vec<u8>,
     #[serde(rename = "_NULL_COUNTS")]
     null_counts: Option<Vec<i64>>,
 }
 
-pub(crate) fn add_system_fields(schema: Schema) -> Result<SchemaRef, PaimonError> {
-    Schema::try_merge(vec![
-        Schema::new(vec![
-            AField::new("_KEY_point_id", DataType::Utf8, false),
-            AField::new("_SEQUENCE_NUMBER", DataType::UInt64, false),
-            AField::new("_VALUE_KIND", DataType::Int8, false),
-        ]),
-        schema,
-    ])
-    .map(SchemaRef::new)
-    .map_err(PaimonError::ArrowError)
+pub(crate) fn add_system_fields(schema: &mut PaimonSchema) -> Result<SchemaRef, PaimonError> {
+    let pks = schema.primary_keys.clone();
+    let schema = schema.arrow_schema();
+    let mut system_columns = schema
+        .fields
+        .iter()
+        .filter(|field| pks.contains(field.name()))
+        .map(|field| {
+            AField::new(
+                format!("_KEY_{}", field.name()),
+                field.data_type().clone(),
+                field.is_nullable(),
+            )
+        })
+        .collect::<Vec<_>>();
+    system_columns.push(AField::new("_SEQUENCE_NUMBER", DataType::UInt64, false));
+    system_columns.push(AField::new("_VALUE_KIND", DataType::Int8, false));
+    Schema::try_merge(vec![Schema::new(system_columns), schema])
+        .map(SchemaRef::new)
+        .map_err(PaimonError::ArrowError)
 }
 
 #[allow(dead_code)]

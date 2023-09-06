@@ -41,6 +41,8 @@ tower = "0.4"
 # Datafusion
 datafusion = { version = "28.0.0", features = ["avro", "apache-avro"]}
 datafusion-common = { version = "28.0.0", features = ["avro", "apache-avro", "parquet", "object_store"]}
+# datafusion = { git = "https://github.com/Asura7969/arrow-datafusion", branch = "v28-paimon", features = ["avro", "apache-avro"]}
+# datafusion-common = { git = "https://github.com/Asura7969/arrow-datafusion", branch = "v28-paimon", features = ["avro", "apache-avro", "parquet", "object_store"]}
 datafusion-expr = "28.0.0"
 datafusion-optimizer = "28.0.0"
 datafusion-sql = "28.0.0"

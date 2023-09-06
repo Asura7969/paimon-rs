@@ -150,4 +150,30 @@ mod tests {
         assert!(arrow_print_batches(&batches).is_ok());
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_read_avro_table() -> Result<(), PaimonError> {
+        let ctx = context_with_delta_table_factory();
+        let d = test_paimonm_table_path("avro_parquet_table");
+
+        let sql = format!(
+            "CREATE EXTERNAL TABLE avro_parquet_table STORED AS PAIMON OPTIONS ('scan.snapshot-id' '1') LOCATION '{}'",
+            d.as_str()
+        );
+
+        let _ = ctx
+            .sql(sql.as_str())
+            .await
+            .expect("Failed to register table!");
+
+        let batches = ctx
+            .sql("SELECT point_id,address FROM avro_parquet_table")
+            .await?
+            .collect()
+            .await?;
+
+        // arrow_print_batches(&batches).unwrap();
+        assert!(arrow_print_batches(&batches).is_ok());
+        Ok(())
+    }
 }

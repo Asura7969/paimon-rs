@@ -10,19 +10,19 @@ use super::{
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub struct ManifestFileMeta {
-    #[serde(rename = "_VERSION")]
+    #[serde(rename = "_VERSION", default)]
     pub version: i32,
-    #[serde(rename = "_FILE_NAME")]
+    #[serde(rename = "_FILE_NAME", default)]
     pub file_name: String,
-    #[serde(rename = "_FILE_SIZE")]
+    #[serde(rename = "_FILE_SIZE", default)]
     pub file_size: i64,
-    #[serde(rename = "_NUM_ADDED_FILES")]
+    #[serde(rename = "_NUM_ADDED_FILES", default)]
     pub num_added_files: i64,
-    #[serde(rename = "_NUM_DELETED_FILES")]
+    #[serde(rename = "_NUM_DELETED_FILES", default)]
     pub num_deleted_files: i64,
-    #[serde(rename = "_PARTITION_STATS")]
+    #[serde(rename = "_PARTITION_STATS", default)]
     pub partition_stats: Option<PartitionStat>,
-    #[serde(rename = "_SCHEMA_ID")]
+    #[serde(rename = "_SCHEMA_ID", default)]
     pub schema_id: i64,
 }
 

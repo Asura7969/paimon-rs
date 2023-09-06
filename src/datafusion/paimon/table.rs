@@ -12,7 +12,7 @@ use datafusion_expr::{Expr, TableType};
 
 use crate::datafusion::{
     builder::PaimonTableBuilder,
-    paimon::{exec::MergeExec, reader::read_parquet},
+    paimon::{exec::MergeExec, reader::generate_execution_plan},
 };
 
 use super::{snapshot::Snapshot, PaimonSchema};
@@ -85,10 +85,7 @@ impl TableProvider for PaimonProvider {
             None
         };
 
-        println!("old projection: {:?}", projection);
-        println!("new projection: {:?}", new_projection);
-
-        let parquet_exec = read_parquet(
+        let exec = generate_execution_plan(
             &self.table_path,
             &entries,
             &mut paimon_schema,
@@ -98,10 +95,7 @@ impl TableProvider for PaimonProvider {
         )
         .unwrap();
 
-        Ok(Arc::new(MergeExec::new(
-            paimon_schema,
-            Arc::new(parquet_exec),
-        )))
+        Ok(Arc::new(MergeExec::new(paimon_schema, exec)))
     }
 }
 

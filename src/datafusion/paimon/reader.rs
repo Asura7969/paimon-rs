@@ -9,7 +9,8 @@ use crate::datafusion::paimon::ManifestFileMeta;
 use apache_avro::{from_value, Reader as AvroReader};
 use bytes::Bytes;
 use datafusion::datasource::listing::{ListingTableUrl, PartitionedFile};
-use datafusion::datasource::physical_plan::{FileScanConfig, ParquetExec};
+use datafusion::datasource::physical_plan::{AvroExec, FileScanConfig, ParquetExec};
+use datafusion::physical_plan::ExecutionPlan;
 use datafusion_common::Statistics;
 use datafusion_expr::Expr;
 use futures::future::{BoxFuture, FutureExt};
@@ -151,14 +152,14 @@ async fn read_avro_bytes<T: Serialize + for<'a> Deserialize<'a>>(
 }
 
 #[allow(dead_code)]
-pub fn read_parquet(
+pub fn generate_execution_plan(
     url: &ListingTableUrl,
     entries: &[ManifestEntry],
     file_schema: &mut PaimonSchema,
     projection: Option<Vec<usize>>,
     _filters: &[Expr],
     _limit: Option<usize>,
-) -> Result<ParquetExec, PaimonError> {
+) -> Result<Arc<dyn ExecutionPlan>, PaimonError> {
     let file_groups = entries
         .iter()
         .filter(|m| m.kind == 0 && m.file.is_some())
@@ -169,28 +170,32 @@ pub fn read_parquet(
         .filter(|o| o.is_some())
         .map(|o| Into::into(o.unwrap()))
         .collect::<Vec<PartitionedFile>>();
-    let file_schema = add_system_fields(file_schema.arrow_schema())?;
+
+    let file_format = file_schema.get_file_format();
+    let file_schema = add_system_fields(file_schema)?;
     // Create a async parquet reader builder with batch_size.
     // batch_size is the number of rows to read up to buffer once from pages, defaults to 1024
 
-    // schema_coercion.rs
-    let parquet_exec: ParquetExec = ParquetExec::new(
-        FileScanConfig {
-            object_store_url: url.object_store(),
-            file_groups: vec![file_groups],
-            file_schema,
-            statistics: Statistics::default(),
-            projection,
-            limit: None,
-            table_partition_cols: vec![],
-            output_ordering: vec![],
-            infinite_source: false,
-        },
-        None,
-        None,
-    );
+    let base_config = FileScanConfig {
+        object_store_url: url.object_store(),
+        file_groups: vec![file_groups],
+        file_schema,
+        statistics: Statistics::default(),
+        projection,
+        limit: None,
+        // TODO: fill partition column
+        table_partition_cols: vec![],
+        output_ordering: vec![],
+        infinite_source: false,
+    };
 
-    Ok(parquet_exec)
+    match file_format {
+        FileFormat::Parquet => Ok(Arc::new(ParquetExec::new(base_config, None, None))),
+        FileFormat::Avro => Ok(Arc::new(AvroExec::new(base_config))),
+        FileFormat::Orc => Err(PaimonError::Generic(
+            "No support orc file format data".to_string(),
+        )),
+    }
 }
 
 #[allow(unused_imports)]
@@ -226,7 +231,7 @@ mod tests {
             &storage,
             &Path::from_iter(vec![
                 "manifest",
-                "manifest-90cbba21-37fe-4e9e-ba86-71e680b87955-1",
+                "manifest-90cbba21-37fe-4e9e-ba86-71e680b87955-0",
             ]),
         )
         .await?;

@@ -36,7 +36,6 @@ pub fn record_batches_to_json_rows(
 
     if !rows.is_empty() {
         let schema = batches[0].schema();
-        println!("schema: {}", schema);
 
         let mut base = 0;
         for batch in batches {
