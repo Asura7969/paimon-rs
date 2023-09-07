@@ -29,15 +29,21 @@ use super::PaimonSchema;
 pub struct MergeExec {
     pub(crate) input: Arc<dyn ExecutionPlan>,
     paimon_schema: PaimonSchema,
+    limit: Option<usize>,
     // merge_func: Fn<>
 }
 
 impl MergeExec {
     #[allow(dead_code)]
-    pub fn new(paimon_schema: PaimonSchema, input: Arc<dyn ExecutionPlan>) -> Self {
+    pub fn new(
+        paimon_schema: PaimonSchema,
+        input: Arc<dyn ExecutionPlan>,
+        limit: Option<usize>,
+    ) -> Self {
         MergeExec {
             paimon_schema,
             input,
+            limit,
         }
     }
 }
@@ -94,6 +100,7 @@ impl ExecutionPlan for MergeExec {
                 captured_schema,
                 context,
                 self.paimon_schema.clone(),
+                self.limit.unwrap_or(usize::MIN),
             )),
         )))
     }
@@ -113,6 +120,7 @@ async fn merge_batch(
     schema: SchemaRef,
     context: Arc<TaskContext>,
     paimon_schema: PaimonSchema,
+    limit: usize,
 ) -> Result<RecordBatch> {
     let records: Vec<RecordBatch> = collect(input, context.clone()).await?;
     let batch = concat_batches(&schema, records.iter())?;
@@ -139,11 +147,28 @@ async fn merge_batch(
         .into_values()
         .map(|(_, _, idx)| idx)
         .collect::<Vec<usize>>();
-    let idx: Vec<_> = (0..count).map(|x| idx.contains(&x)).collect();
+    let has_limit = limit > 0;
+    let mut total = 0;
+    let idx: Vec<_> = (0..count)
+        .map(|x| {
+            if has_limit {
+                if idx.contains(&x) {
+                    total += 1;
+                    total <= limit
+                } else {
+                    false
+                }
+            } else {
+                idx.contains(&x)
+            }
+        })
+        .collect();
+
     let merge_filter: BooleanArray = BooleanArray::from(idx);
 
     let project_idx = delete_system_fields(pk.len() + 2, batch.schema().fields.len());
     let batch = filter_record_batch(&batch.project(&project_idx)?, &merge_filter)?;
+
     Ok(batch)
 }
 

@@ -95,7 +95,7 @@ impl TableProvider for PaimonProvider {
         )
         .unwrap();
 
-        Ok(Arc::new(MergeExec::new(paimon_schema, exec)))
+        Ok(Arc::new(MergeExec::new(paimon_schema, exec, limit)))
     }
 }
 

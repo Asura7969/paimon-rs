@@ -10,11 +10,10 @@ use std::{collections::HashMap, env, path::Path, sync::Arc};
 use self::{error::PaimonError, manifest_list::ManifestFileMeta, reader::FileFormat, utils::from};
 
 pub mod error;
-mod example;
 mod exec;
 mod json_util;
-mod manifest;
-mod manifest_list;
+pub mod manifest;
+pub mod manifest_list;
 mod reader;
 pub mod snapshot;
 pub mod table;
@@ -40,16 +39,6 @@ pub enum CommitKind {
     #[serde(rename = "COMPACT")]
     Compact,
 }
-
-// #[allow(dead_code)]
-// fn get_manifest_list(
-//     table_path: &str,
-//     file_name: &str,
-//     format: &FileFormat,
-// ) -> Result<Vec<ManifestFileMeta>, PaimonError> {
-//     let path = format!("{}/manifest/{}", table_path, file_name);
-//     manifest_list(path.as_str(), format)
-// }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 pub struct PaimonSchema {
@@ -151,8 +140,6 @@ pub(crate) fn test_paimonm_table_path(table_name: &str) -> String {
 
 #[allow(dead_code)]
 pub(crate) async fn test_local_store(root_path: &str) -> (ListingTableUrl, Arc<DynObjectStore>) {
-    // let path = "ods_mysql_paimon_points_5/snapshot/snapshot-5";
-
     let path = test_paimonm_table_path(root_path);
     let url = ListingTableUrl::parse(path.as_str()).unwrap();
     let store = LocalFileSystem::new_with_prefix(Path::new(path.as_str())).unwrap();

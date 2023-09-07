@@ -167,7 +167,7 @@ mod tests {
             .expect("Failed to register table!");
 
         let batches = ctx
-            .sql("SELECT point_id,address FROM avro_parquet_table")
+            .sql("SELECT point_id,address,create_time FROM avro_parquet_table limit 3")
             .await?
             .collect()
             .await?;
