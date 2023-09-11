@@ -14,6 +14,8 @@ use crate::datafusion::paimon::{manifest::ManifestEntry, utils::read_to_string};
 #[allow(dead_code)]
 const SNAPSHOT_PREFIX: &str = "snapshot-";
 #[allow(dead_code)]
+const TAG_PREFIX: &str = "tag-";
+#[allow(dead_code)]
 const EARLIEST: &str = "EARLIEST";
 const LATEST: &str = "LATEST";
 
@@ -158,8 +160,19 @@ impl SnapshotManager {
         format!("/snapshot/{}{}", SNAPSHOT_PREFIX, snapshot_id)
     }
 
+    fn tag_path(&self, tag_name: &str) -> String {
+        format!("/tag/{}{}", TAG_PREFIX, tag_name)
+    }
+
     pub(crate) async fn snapshot(&self, snapshot_id: i64) -> Result<Snapshot, PaimonError> {
         let path = self.snapshot_path(snapshot_id);
+        let content = read_to_string(&self.storage, &Path::from(path)).await?;
+        let s: Snapshot = serde_json::from_str(content.as_str())?;
+        Ok(s)
+    }
+
+    pub(crate) async fn tag(&self, tag_name: &str) -> Result<Snapshot, PaimonError> {
+        let path = self.tag_path(tag_name);
         let content = read_to_string(&self.storage, &Path::from(path)).await?;
         let s: Snapshot = serde_json::from_str(content.as_str())?;
         Ok(s)

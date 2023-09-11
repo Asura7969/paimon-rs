@@ -62,7 +62,7 @@ async fn create_external_table(
         "file" => {
             #[cfg(windows)]
             {
-                let loacl = format!("{}", &table_path.prefix().as_ref());
+                let loacl = (&table_path.prefix().as_ref()).to_string();
                 Arc::new(LocalFileSystem::new_with_prefix(Path::new(loacl.as_str()))?)
             }
 
