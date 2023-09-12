@@ -9,6 +9,7 @@ use std::{collections::HashMap, env, path::Path, sync::Arc};
 
 use self::{error::PaimonError, manifest_list::ManifestFileMeta, reader::FileFormat, utils::from};
 
+pub mod consumer;
 pub mod error;
 mod exec;
 mod json_util;

@@ -8,6 +8,8 @@ use object_store::DynObjectStore;
 use super::paimon::{snapshot::SnapshotManager, table::PaimonProvider};
 
 pub const SCAN_SNAPSHOT_ID: &str = "scan.snapshot-id";
+pub const CONSUMER_ID: &str = "consumer-id";
+pub const SCAN_TAG_NAME: &str = "scan.tag-name";
 
 #[derive(Debug)]
 pub struct PaimonTableLoadOptions {
@@ -89,6 +91,28 @@ impl PaimonTableBuilder {
                 .snapshot(id)
                 .await
                 .unwrap_or_else(|_| panic!("read snapshot failed, id: {}", id))
+        } else if self.options.options.contains_key(CONSUMER_ID) {
+            let id = self
+                .options
+                .options
+                .get(CONSUMER_ID)
+                .map(|s| s.parse::<i64>().expect("consumer id error"))
+                .unwrap();
+            manager
+                .consumer(id)
+                .await
+                .unwrap_or_else(|_| panic!("read consumer failed, id: {}", id))
+        } else if self.options.options.contains_key(SCAN_TAG_NAME) {
+            let tag_name = self
+                .options
+                .options
+                .get(SCAN_TAG_NAME)
+                .map(|s| s.parse::<String>().expect("tag error"))
+                .unwrap();
+            manager
+                .tag(tag_name.as_str())
+                .await
+                .unwrap_or_else(|_| panic!("read tag failed, tag-name: {}", tag_name))
         } else {
             manager
                 .latest_snapshot()

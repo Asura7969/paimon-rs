@@ -6,8 +6,8 @@ use object_store::{path::Path, DynObjectStore};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    error::PaimonError, manifest_list::ManifestFileMeta, reader::manifest_list, CommitKind,
-    PaimonSchema,
+    consumer::Consumer, error::PaimonError, manifest_list::ManifestFileMeta, reader::manifest_list,
+    CommitKind, PaimonSchema,
 };
 use crate::datafusion::paimon::{manifest::ManifestEntry, utils::read_to_string};
 
@@ -15,6 +15,8 @@ use crate::datafusion::paimon::{manifest::ManifestEntry, utils::read_to_string};
 const SNAPSHOT_PREFIX: &str = "snapshot-";
 #[allow(dead_code)]
 const TAG_PREFIX: &str = "tag-";
+#[allow(dead_code)]
+const CONSUMER_PREFIX: &str = "consumer-";
 #[allow(dead_code)]
 const EARLIEST: &str = "EARLIEST";
 const LATEST: &str = "LATEST";
@@ -164,6 +166,10 @@ impl SnapshotManager {
         format!("/tag/{}{}", TAG_PREFIX, tag_name)
     }
 
+    fn consumer_path(&self, consumer_id: i64) -> String {
+        format!("/consumer/{}{}", CONSUMER_PREFIX, consumer_id)
+    }
+
     pub(crate) async fn snapshot(&self, snapshot_id: i64) -> Result<Snapshot, PaimonError> {
         let path = self.snapshot_path(snapshot_id);
         let content = read_to_string(&self.storage, &Path::from(path)).await?;
@@ -175,6 +181,14 @@ impl SnapshotManager {
         let path = self.tag_path(tag_name);
         let content = read_to_string(&self.storage, &Path::from(path)).await?;
         let s: Snapshot = serde_json::from_str(content.as_str())?;
+        Ok(s)
+    }
+
+    pub(crate) async fn consumer(&self, consumer_id: i64) -> Result<Snapshot, PaimonError> {
+        let path = self.consumer_path(consumer_id);
+        let content = read_to_string(&self.storage, &Path::from(path)).await?;
+        let consumer: Consumer = Consumer::from_json(&content)?;
+        let s: Snapshot = self.snapshot(consumer.next_snapshot).await?;
         Ok(s)
     }
 
@@ -211,7 +225,7 @@ mod tests {
     pub(crate) async fn get_latest_metedata_file(
         storage: &Arc<DynObjectStore>,
     ) -> Result<Snapshot, PaimonError> {
-        let latest_path = format!("/snapshot/LATEST");
+        let latest_path = "/snapshot/LATEST".to_string();
         let latest_num = read_to_string(storage, &Path::from(latest_path)).await?;
 
         let latest_path = format!("/snapshot/snapshot-{}", latest_num);
