@@ -203,14 +203,13 @@ impl SnapshotManager {
         }
     }
 
-    pub(crate) async fn latest_snapshot(&self) -> Option<Snapshot> {
+    pub(crate) async fn latest_snapshot(&self) -> Result<Snapshot, PaimonError> {
         if let Some(id) = self.latest_snapshot_id().await {
-            match self.snapshot(id).await {
-                core::result::Result::Ok(s) => Some(s),
-                Err(_) => None,
-            }
+            self.snapshot(id).await
         } else {
-            None
+            Err(PaimonError::Generic(
+                "Not found latest snapshot id".to_string(),
+            ))
         }
     }
 }

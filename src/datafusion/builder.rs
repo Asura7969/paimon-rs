@@ -1,5 +1,6 @@
-use chrono::{DateTime, Utc};
 use datafusion::{datasource::listing::ListingTableUrl, execution::context::SessionState};
+use datafusion_common::DataFusionError;
+use datafusion_sql::sqlparser::parser::ParserError;
 use std::{collections::HashMap, sync::Arc};
 use url::Url;
 
@@ -30,6 +31,40 @@ impl PaimonTableLoadOptions {
             options: HashMap::new(),
         }
     }
+
+    pub fn get_scan_mode(&self) -> ScanModeEnum {
+        ScanModeEnum::from_option(&self.options)
+    }
+}
+
+pub enum ScanModeEnum {
+    SnapshotId(i64),
+    TagName(String),
+    ConsumerId(i64),
+    Latest,
+}
+
+impl ScanModeEnum {
+    pub fn from_option(option: &HashMap<String, String>) -> ScanModeEnum {
+        if option.contains_key(SCAN_SNAPSHOT_ID) {
+            let id = option
+                .get(SCAN_SNAPSHOT_ID)
+                .map(|s| s.parse::<i64>().expect("snapshot id error"))
+                .unwrap();
+            ScanModeEnum::SnapshotId(id)
+        } else if option.contains_key(CONSUMER_ID) {
+            let id = option
+                .get(CONSUMER_ID)
+                .map(|s| s.parse::<i64>().expect("snapshot id error"))
+                .unwrap();
+            ScanModeEnum::ConsumerId(id)
+        } else if option.contains_key(SCAN_TAG_NAME) {
+            let tag_name = option.get(SCAN_TAG_NAME).unwrap().clone();
+            ScanModeEnum::TagName(tag_name)
+        } else {
+            ScanModeEnum::Latest
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -50,14 +85,6 @@ impl PaimonTableBuilder {
         }
     }
 
-    pub fn with_version(mut self, _version: i64) -> Self {
-        todo!()
-    }
-
-    pub fn with_timestamp(mut self, _timestamp: DateTime<Utc>) -> Self {
-        todo!()
-    }
-
     pub fn with_storage_backend(mut self, storage: Arc<DynObjectStore>, location: Url) -> Self {
         self.options.storage_backend = Some((storage, location));
         self
@@ -68,57 +95,25 @@ impl PaimonTableBuilder {
         self
     }
 
+    fn throw_err(msg: String) -> DataFusionError {
+        DataFusionError::SQL(ParserError::ParserError(msg))
+    }
+
     pub async fn build(self) -> datafusion::error::Result<PaimonProvider> {
-        // let config = DeltaTableConfig {
-        //     require_tombstones: self.options.require_tombstones,
-        //     require_files: self.options.require_files,
-        // };
-        let path = self.options.table_uri;
+        let path = &self.options.table_uri;
         let url = ListingTableUrl::parse(path)?;
 
         let storage = &self.state.runtime_env().object_store(url.clone())?;
 
         let manager = SnapshotManager::new(url.clone(), storage.clone());
 
-        let snapshot = if self.options.options.contains_key(SCAN_SNAPSHOT_ID) {
-            let id = self
-                .options
-                .options
-                .get(SCAN_SNAPSHOT_ID)
-                .map(|s| s.parse::<i64>().expect("snapshot id error"))
-                .unwrap();
-            manager
-                .snapshot(id)
-                .await
-                .unwrap_or_else(|_| panic!("read snapshot failed, id: {}", id))
-        } else if self.options.options.contains_key(CONSUMER_ID) {
-            let id = self
-                .options
-                .options
-                .get(CONSUMER_ID)
-                .map(|s| s.parse::<i64>().expect("consumer id error"))
-                .unwrap();
-            manager
-                .consumer(id)
-                .await
-                .unwrap_or_else(|_| panic!("read consumer failed, id: {}", id))
-        } else if self.options.options.contains_key(SCAN_TAG_NAME) {
-            let tag_name = self
-                .options
-                .options
-                .get(SCAN_TAG_NAME)
-                .map(|s| s.parse::<String>().expect("tag error"))
-                .unwrap();
-            manager
-                .tag(tag_name.as_str())
-                .await
-                .unwrap_or_else(|_| panic!("read tag failed, tag-name: {}", tag_name))
-        } else {
-            manager
-                .latest_snapshot()
-                .await
-                .expect("not find latest snapshot")
-        };
+        let snapshot = match &self.options.get_scan_mode() {
+            ScanModeEnum::SnapshotId(snapshot_id) => manager.snapshot(*snapshot_id).await,
+            ScanModeEnum::ConsumerId(consumer_id) => manager.consumer(*consumer_id).await,
+            ScanModeEnum::TagName(tag_name) => manager.tag(tag_name.as_str()).await,
+            ScanModeEnum::Latest => manager.latest_snapshot().await,
+        }
+        .map_err(|err| Self::throw_err(err.to_string()))?;
 
         Ok(PaimonProvider {
             table_path: url,
@@ -128,15 +123,9 @@ impl PaimonTableBuilder {
         })
     }
 
-    /// Build the [`DeltaTable`] and load its state
+    /// Build the [`PaimonTable`] and load its state
     pub async fn load(self) -> datafusion::error::Result<PaimonProvider> {
-        // let version = self.options.version.clone();
         let mut table = self.build().await?;
-        // match version {
-        //     DeltaVersion::Newest => table.load().await?,
-        //     DeltaVersion::Version(v) => table.load_version(v).await?,
-        //     DeltaVersion::Timestamp(ts) => table.load_with_datetime(ts).await?,
-        // }
         table.load().await?;
         Ok(table)
     }
