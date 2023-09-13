@@ -55,7 +55,7 @@ impl ScanModeEnum {
         } else if option.contains_key(CONSUMER_ID) {
             let id = option
                 .get(CONSUMER_ID)
-                .map(|s| s.parse::<i64>().expect("snapshot id error"))
+                .map(|s| s.parse::<i64>().expect("consumer id error"))
                 .unwrap();
             ScanModeEnum::ConsumerId(id)
         } else if option.contains_key(SCAN_TAG_NAME) {
