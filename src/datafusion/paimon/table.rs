@@ -163,7 +163,7 @@ mod tests {
     fn get_local_file_system(url: &ListingTableUrl) -> String {
         #[cfg(windows)]
         {
-            format!("{}", &url.prefix().as_ref())
+            (&url.prefix().as_ref()).to_string()
         }
 
         #[cfg(unix)]

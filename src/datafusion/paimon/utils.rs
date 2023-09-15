@@ -114,7 +114,58 @@ pub(crate) fn extract_num(input: &str) -> IResult<&str, (i32, Option<i32>)> {
 
 #[cfg(test)]
 mod tests {
+    use ahash::RandomState;
+    use arrow_array::{Array, Int32Array};
+    use arrow_schema::{Field, Schema};
+    use datafusion::physical_plan::hash_utils::create_hashes;
+    // use fasthash::{murmur3::Hasher32, FastHasher};
+
     use super::*;
+
+    fn bucket(hash: i32, bucket_num: i32) -> i32 {
+        (hash % bucket_num).abs()
+    }
+
+    #[test]
+    fn hash_test() {
+        // let random_state = RandomState::<Hasher32>::new();
+        let random_state = RandomState::new();
+        let _schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int32, false),
+            Field::new("b", DataType::Int32, false),
+            Field::new("c", DataType::Int32, false),
+        ]));
+
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(Int32Array::from(vec![5])),
+            // Arc::new(Int32Array::from(vec![6])),
+            // Arc::new(Int32Array::from(vec![7])),
+        ];
+
+        // let batch = RecordBatch::try_new(
+        //     schema,
+        //     vec![
+        //         Arc::new(Int32Array::from(vec![5])),
+        //         Arc::new(Int32Array::from(vec![6])),
+        //         Arc::new(Int32Array::from(vec![7])),
+        //     ],
+        // )
+        // .unwrap();
+
+        let mut batch_hashes = vec![0; 1];
+
+        let a = create_hashes(&columns, &random_state, &mut batch_hashes).unwrap();
+        for v in a {
+            let b = bucket(*v as i32, 100);
+            println!("bucket: {}", b);
+        }
+
+        // let mut h = Hasher32::new();
+        // let v = 5;
+        // h.write(v);
+        // let b = bucket(h.finish(), 100);
+        // println!("bucket: {}", b);
+    }
 
     #[test]
     fn extract_num_test() {

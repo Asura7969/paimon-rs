@@ -211,7 +211,7 @@ mod tests {
     pub(crate) async fn get_latest_metedata_file(
         storage: &Arc<DynObjectStore>,
     ) -> Result<Snapshot, PaimonError> {
-        let latest_path = format!("/snapshot/LATEST");
+        let latest_path = "/snapshot/LATEST".to_string();
         let latest_num = read_to_string(storage, &Path::from(latest_path)).await?;
 
         let latest_path = format!("/snapshot/snapshot-{}", latest_num);
