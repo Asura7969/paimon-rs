@@ -30,11 +30,11 @@ arrow-schema = "43.0.0"
 arrow-array = "43.0.0"
 arrow-select = "43.0.0"
 arrow-json = "43.0.0"
+arrow-cast = { version = "43.0.0", features = ["comfy-table", "prettyprint"] }
 apache-avro = { version = "0.15.0", features = ["snappy"]}
 
 parquet = {version= "43.0.0", features = ["arrow", "async", "object_store"]}
 tempfile = "3.5.0"
-arrow-cast = { version = "43.0.0", features = ["comfy-table", "prettyprint"] }
 #turmoil = "0.5.6"
 async-stream = "0.3"
 tower = "0.4"
@@ -62,7 +62,7 @@ ahash = "0.8.3"
 url = "2.4.0"
 
 num-traits = { version = "0.2"}
-# fasthash = "0.4.0"
+fasthash = "0.4.0"
 
 [features]
 hdfs = ["datafusion-objectstore-hdfs"]

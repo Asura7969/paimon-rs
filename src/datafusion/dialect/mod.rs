@@ -22,7 +22,7 @@ impl Dialect for PaimonDialect {
         ch.is_alphabetic() || ch.is_ascii_digit() || ch == '_' || ch == '='
     }
 
-    fn parse_statement(&self, parser: &mut Parser) -> Option<Result<Statement, ParserError>> {
+    fn parse_statement(&self, parser: &mut Parser<'_>) -> Option<Result<Statement, ParserError>> {
         if parser.parse_keyword(Keyword::SELECT) {
             parser.prev_token();
             Some(Ok(Statement::Query(Box::new(
@@ -38,7 +38,7 @@ impl Dialect for PaimonDialect {
 //     todo!()
 // }
 
-pub fn parse_query(parser: &mut Parser) -> Result<Query, ParserError> {
+pub fn parse_query(parser: &mut Parser<'_>) -> Result<Query, ParserError> {
     // let _guard = parser.recursion_counter.try_decrease()?;
     let with = if parser.parse_keyword(Keyword::WITH) {
         Some(With {
@@ -103,7 +103,7 @@ pub fn parse_query(parser: &mut Parser) -> Result<Query, ParserError> {
 }
 
 #[allow(dead_code)]
-pub fn parse_options(parser: &mut Parser) -> Result<(), ParserError> {
+pub fn parse_options(parser: &mut Parser<'_>) -> Result<(), ParserError> {
     let (mut options, mut has_as, mut alias) = (vec![], false, None);
 
     if parser.peek_token().token != Token::EOF {
@@ -139,7 +139,7 @@ pub fn parse_options(parser: &mut Parser) -> Result<(), ParserError> {
 pub struct Options(Vec<SqlOption>);
 
 impl fmt::Display for Options {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "OPTIONS ({:?})", self.0)?;
         Ok(())
     }

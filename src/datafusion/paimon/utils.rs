@@ -114,57 +114,56 @@ pub(crate) fn extract_num(input: &str) -> IResult<&str, (i32, Option<i32>)> {
 
 #[cfg(test)]
 mod tests {
-    use ahash::RandomState;
+    use arrow::row::{Row, RowConverter, SortField};
     use arrow_array::{Array, Int32Array};
     use arrow_schema::{Field, Schema};
-    use datafusion::physical_plan::hash_utils::create_hashes;
-    // use fasthash::{murmur3::Hasher32, FastHasher};
+    use fasthash::Murmur3Hasher;
+    use std::hash::{Hash, Hasher};
 
     use super::*;
 
-    fn bucket(hash: i32, bucket_num: i32) -> i32 {
+    fn bucket(hash: i64, bucket_num: i64) -> i64 {
         (hash % bucket_num).abs()
     }
 
     #[test]
     fn hash_test() {
-        // let random_state = RandomState::<Hasher32>::new();
-        let random_state = RandomState::new();
-        let _schema = Arc::new(Schema::new(vec![
-            Field::new("a", DataType::Int32, false),
-            Field::new("b", DataType::Int32, false),
-            Field::new("c", DataType::Int32, false),
+        // let s = ahash::RandomState::default();
+        // let random_state = RandomState::new();
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int32, true),
+            Field::new("b", DataType::Int32, true),
+            // Field::new("c", DataType::Int64, true),
         ]));
 
         let columns: Vec<Arc<dyn Array>> = vec![
             Arc::new(Int32Array::from(vec![5])),
-            // Arc::new(Int32Array::from(vec![6])),
-            // Arc::new(Int32Array::from(vec![7])),
+            Arc::new(Int32Array::from(vec![6])),
+            // Arc::new(Int64Array::from(vec![7])),
         ];
 
-        // let batch = RecordBatch::try_new(
-        //     schema,
-        //     vec![
-        //         Arc::new(Int32Array::from(vec![5])),
-        //         Arc::new(Int32Array::from(vec![6])),
-        //         Arc::new(Int32Array::from(vec![7])),
-        //     ],
-        // )
-        // .unwrap();
+        let mut row_converter = RowConverter::new(
+            schema
+                .fields()
+                .iter()
+                .map(|f| SortField::new(f.data_type().clone()))
+                .collect(),
+        )
+        .unwrap();
 
-        let mut batch_hashes = vec![0; 1];
+        let rows = &mut row_converter.convert_columns(&columns).unwrap();
+        assert_eq!(rows.num_rows(), 1);
+        let row = rows.row(0);
 
-        let a = create_hashes(&columns, &random_state, &mut batch_hashes).unwrap();
-        for v in a {
-            let b = bucket(*v as i32, 100);
-            println!("bucket: {}", b);
-        }
+        let b = bucket(hash(&row) as i64, 100);
+        println!("bucket: {}", b);
+    }
 
-        // let mut h = Hasher32::new();
-        // let v = 5;
-        // h.write(v);
-        // let b = bucket(h.finish(), 100);
-        // println!("bucket: {}", b);
+    fn hash(t: &Row<'_>) -> u64 {
+        let mut s: Murmur3Hasher = Default::default();
+
+        t.hash(&mut s);
+        s.finish()
     }
 
     #[test]

@@ -23,7 +23,7 @@ pub struct PaimonQuery {
 }
 
 impl fmt::Display for PaimonQuery {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(ref with) = self.with {
             write!(f, "{with} ")?;
         }
