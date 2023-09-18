@@ -129,7 +129,7 @@ impl Snapshot {
         // let serialized = serde_json::to_string(&r).unwrap();
         // println!("{}", serialized);
         join_all(file_meta.iter().map(|e| {
-            let _file_name = &e.file_name;
+            let _ = &e.file_name;
             // let err_msg = format!("read {}", file_name.as_str());
             // TODO: Custom error
             e.manifest(storage, schema)
@@ -222,7 +222,7 @@ mod tests {
     }
     #[tokio::test]
     async fn read_snapshot() -> Result<(), PaimonError> {
-        let (_url, storage) = test_local_store("ods_mysql_paimon_points_5").await;
+        let (_url, storage) = test_local_store("ods_mysql_paimon_points_5");
 
         let json = r#"
             {

@@ -226,7 +226,7 @@ mod tests {
 
     #[tokio::test]
     async fn read_parquet_manifest_test() -> Result<(), PaimonError> {
-        let (_url, storage) = test_local_store("avro_parquet_table").await;
+        let (_url, storage) = test_local_store("avro_parquet_table");
         let manifest = read_parquet_bytes::<ManifestEntry>(
             &storage,
             &Path::from_iter(vec![
@@ -244,7 +244,7 @@ mod tests {
 
     #[tokio::test]
     async fn read_avro_manifest_test() -> Result<(), PaimonError> {
-        let (_url, storage) = test_local_store("ods_mysql_paimon_points_5").await;
+        let (_url, storage) = test_local_store("ods_mysql_paimon_points_5");
         let manifest = read_avro_bytes::<ManifestEntry>(
             &storage,
             &Path::from_iter(vec![

@@ -122,7 +122,7 @@ pub async fn open_table_with_storage_options(
 }
 
 #[allow(dead_code)]
-pub async fn open_table_with_version(
+pub fn open_table_with_version(
     _table_uri: impl AsRef<str>,
     _tag: impl AsRef<str>,
 ) -> datafusion::error::Result<PaimonProvider> {
@@ -182,7 +182,7 @@ mod tests {
 
         let store = LocalFileSystem::new_with_prefix(Path::new(local.as_str())).unwrap();
 
-        let _expected_data = r#"
+        let _ = r#"
         {
           "version" : 3,
           "id" : 5,

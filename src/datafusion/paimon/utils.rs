@@ -112,17 +112,61 @@ pub(crate) fn extract_num(input: &str) -> IResult<&str, (i32, Option<i32>)> {
     }
 }
 
+#[allow(dead_code)]
+fn murmur3_32(buf: &[u8], seed: u32) -> u32 {
+    fn pre_mix(buf: [u8; 4]) -> u32 {
+        u32::from_le_bytes(buf)
+            .wrapping_mul(0xcc9e2d51)
+            .rotate_left(15)
+            .wrapping_mul(0x1b873593)
+    }
+
+    let mut hash = seed;
+
+    let mut i = 0;
+    while i < buf.len() / 4 {
+        let buf = [buf[i * 4], buf[i * 4 + 1], buf[i * 4 + 2], buf[i * 4 + 3]];
+        hash ^= pre_mix(buf);
+        hash = hash.rotate_left(13);
+        hash = hash.wrapping_mul(5).wrapping_add(0xe6546b64);
+
+        i += 1;
+    }
+
+    match buf.len() % 4 {
+        0 => {}
+        1 => {
+            hash ^= pre_mix([buf[i * 4], 0, 0, 0]);
+        }
+        2 => {
+            hash ^= pre_mix([buf[i * 4], buf[i * 4 + 1], 0, 0]);
+        }
+        3 => {
+            hash ^= pre_mix([buf[i * 4], buf[i * 4 + 1], buf[i * 4 + 2], 0]);
+        }
+        _ => { /* unreachable!() */ }
+    }
+
+    hash ^= buf.len() as u32;
+    hash = hash ^ (hash.wrapping_shr(16));
+    hash = hash.wrapping_mul(0x85ebca6b);
+    hash = hash ^ (hash.wrapping_shr(13));
+    hash = hash.wrapping_mul(0xc2b2ae35);
+    hash = hash ^ (hash.wrapping_shr(16));
+
+    hash
+}
+
 #[cfg(test)]
 mod tests {
-    use arrow::row::{Row, RowConverter, SortField};
-    use arrow_array::{Array, Int32Array};
-    use arrow_schema::{Field, Schema};
-    use fasthash::Murmur3Hasher;
-    use std::hash::{Hash, Hasher};
-
     use super::*;
+    use arrow::row::{RowConverter, SortField};
+    use arrow_array::{Array, UInt32Array};
+    use arrow_schema::{Field, Schema};
+    // use fasthash::{murmur3::Hasher32, FastHasher};
+    // use std::hash::{Hash, Hasher};
 
-    fn bucket(hash: i64, bucket_num: i64) -> i64 {
+    fn bucket(hash: i32, bucket_num: i32) -> i32 {
         (hash % bucket_num).abs()
     }
 
@@ -131,15 +175,15 @@ mod tests {
         // let s = ahash::RandomState::default();
         // let random_state = RandomState::new();
         let schema = Arc::new(Schema::new(vec![
-            Field::new("a", DataType::Int32, true),
-            Field::new("b", DataType::Int32, true),
-            // Field::new("c", DataType::Int64, true),
+            Field::new("a", DataType::UInt32, true),
+            // Field::new("b", DataType::UInt32, true),
+            // Field::new("c", DataType::UInt32, true),
         ]));
 
         let columns: Vec<Arc<dyn Array>> = vec![
-            Arc::new(Int32Array::from(vec![5])),
-            Arc::new(Int32Array::from(vec![6])),
-            // Arc::new(Int64Array::from(vec![7])),
+            Arc::new(UInt32Array::from(vec![5])),
+            // Arc::new(UInt32Array::from(vec![0])),
+            // Arc::new(UInt32Array::from(vec![0])),
         ];
 
         let mut row_converter = RowConverter::new(
@@ -155,16 +199,20 @@ mod tests {
         assert_eq!(rows.num_rows(), 1);
         let row = rows.row(0);
 
-        let b = bucket(hash(&row) as i64, 100);
+        let b = bucket(murmur3_32(row.as_ref(), 42) as i32, 100);
+        // let b = bucket(hash(&row) as i32, 100);
         println!("bucket: {}", b);
     }
 
-    fn hash(t: &Row<'_>) -> u64 {
-        let mut s: Murmur3Hasher = Default::default();
+    // #[allow(dead_code)]
+    // fn hash(t: &Row<'_>) -> u64 {
+    //     // let mut s: Murmur3Hasher = Default::default();
 
-        t.hash(&mut s);
-        s.finish()
-    }
+    //     let mut s = Hasher32::with_seed(42);
+
+    //     t.hash(&mut s);
+    //     s.finish()
+    // }
 
     #[test]
     fn extract_num_test() {

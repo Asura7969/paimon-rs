@@ -41,8 +41,8 @@ impl MergeExec {
         limit: Option<usize>,
     ) -> Self {
         MergeExec {
-            paimon_schema,
             input,
+            paimon_schema,
             limit,
         }
     }

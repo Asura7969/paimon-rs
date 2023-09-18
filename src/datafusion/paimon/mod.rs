@@ -139,7 +139,7 @@ pub(crate) fn test_paimonm_table_path(table_name: &str) -> String {
 }
 
 #[allow(dead_code)]
-pub(crate) async fn test_local_store(root_path: &str) -> (ListingTableUrl, Arc<DynObjectStore>) {
+pub(crate) fn test_local_store(root_path: &str) -> (ListingTableUrl, Arc<DynObjectStore>) {
     let path = test_paimonm_table_path(root_path);
     let url = ListingTableUrl::parse(path.as_str()).unwrap();
     let store = LocalFileSystem::new_with_prefix(Path::new(path.as_str())).unwrap();

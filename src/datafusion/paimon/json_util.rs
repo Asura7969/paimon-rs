@@ -1,4 +1,4 @@
-/// copy from arrow_json, support binary parser
+/// copy from `arrow_json`, support binary parser
 use arrow_array::cast::AsArray;
 use arrow_array::cast::*;
 use arrow_array::types::*;
