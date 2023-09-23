@@ -25,6 +25,19 @@ LOCATION 'E:\\rustProject\\paimon-rs\\test\\paimon/default.db\\ods_mysql_paimon_
 ## Doing
 
 - [ ] 集成`datafusion`(持续集成中)
+- [ ] 兼容原始hash算法
+  - [x] TINYINT
+  - [x] SMALLINT
+  - [x] INT
+  - [x] BIGINT
+  - [ ] BOOLEAN
+  - [ ] DOUBLE
+  - [ ] FLOAT
+  - [ ] DECIMAL
+  - [ ] BINARY
+  - [ ] DATE
+  - [ ] TIME
+  - [ ] TIMESTAMP
 
 ## RoadMap
 

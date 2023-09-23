@@ -123,6 +123,8 @@ fn murmur3_32(buf: &[u8], seed: u32) -> u32 {
 
     let mut hash = seed;
 
+    println!("buf: {:?}", buf);
+
     let mut i = 0;
     while i < buf.len() / 4 {
         let buf = [buf[i * 4], buf[i * 4 + 1], buf[i * 4 + 2], buf[i * 4 + 3]];
@@ -161,8 +163,11 @@ fn murmur3_32(buf: &[u8], seed: u32) -> u32 {
 mod tests {
     use super::*;
     use arrow::row::{RowConverter, SortField};
-    use arrow_array::{Array, UInt32Array};
+    use arrow_array::UInt16Array;
+    #[allow(unused_imports)]
+    use arrow_array::{Array, BooleanArray, Int8Array, UInt32Array, UInt64Array};
     use arrow_schema::{Field, Schema};
+    use bytes::{Buf, BytesMut};
     // use fasthash::{murmur3::Hasher32, FastHasher};
     // use std::hash::{Hash, Hasher};
 
@@ -175,15 +180,15 @@ mod tests {
         // let s = ahash::RandomState::default();
         // let random_state = RandomState::new();
         let schema = Arc::new(Schema::new(vec![
-            Field::new("a", DataType::UInt32, true),
+            Field::new("a", DataType::UInt16, true),
             // Field::new("b", DataType::UInt32, true),
             // Field::new("c", DataType::UInt32, true),
         ]));
 
         let columns: Vec<Arc<dyn Array>> = vec![
-            Arc::new(UInt32Array::from(vec![5])),
-            // Arc::new(UInt32Array::from(vec![0])),
-            // Arc::new(UInt32Array::from(vec![0])),
+            Arc::new(UInt16Array::from(vec![5])),
+            // Arc::new(UInt32Array::from(vec![6])),
+            // Arc::new(UInt32Array::from(vec![7])),
         ];
 
         let mut row_converter = RowConverter::new(
@@ -199,11 +204,48 @@ mod tests {
         assert_eq!(rows.num_rows(), 1);
         let row = rows.row(0);
 
+        let restore_mem = restore_java_mem_struct(row.as_ref(), DataType::UInt16);
+        assert_eq!(
+            restore_mem.as_ref(),
+            &[0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0]
+        );
+
         let b = bucket(murmur3_32(row.as_ref(), 42) as i32, 100);
         // let b = bucket(hash(&row) as i32, 100);
         println!("bucket: {}", b);
     }
 
+    // https://github.com/apache/incubator-paimon/blob/master/paimon-common/src/main/java/org/apache/paimon/data/BinaryRow.java
+    const HEADER_BITS: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+
+    fn restore_java_mem_struct(buf: &[u8], data_type: DataType) -> BytesMut {
+        println!("buf: {:?}", buf);
+
+        let mut bytes = BytesMut::with_capacity(0);
+        bytes.extend_from_slice(&HEADER_BITS);
+        match data_type {
+            DataType::Boolean | DataType::UInt8 => {
+                bytes.extend_from_slice(&buf[1..2]);
+                bytes.extend(vec![0u8; 7]);
+            }
+            DataType::UInt16 => {
+                let p = BytesMut::from(&buf[1..3]).freeze().get_u16().to_le_bytes();
+                bytes.extend_from_slice(&p);
+                bytes.extend(vec![0u8; 6]);
+            }
+            DataType::UInt32 => {
+                let p = BytesMut::from(&buf[1..5]).freeze().get_u32().to_le_bytes();
+                bytes.extend_from_slice(&p);
+                bytes.extend(vec![0u8; 4]);
+            }
+            DataType::UInt64 => {
+                let p = BytesMut::from(&buf[1..9]).freeze().get_u64().to_le_bytes();
+                bytes.extend_from_slice(&p);
+            }
+            _ => unimplemented!(),
+        }
+        bytes
+    }
     // #[allow(dead_code)]
     // fn hash(t: &Row<'_>) -> u64 {
     //     // let mut s: Murmur3Hasher = Default::default();

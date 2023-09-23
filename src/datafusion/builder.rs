@@ -104,7 +104,7 @@ impl PaimonTableBuilder {
         })
     }
 
-    /// Build the [`DeltaTable`] and load its state
+    /// Build the [`PaimonTable`] and load its state
     pub async fn load(self) -> datafusion::error::Result<PaimonProvider> {
         // let version = self.options.version.clone();
         let mut table = self.build().await?;
