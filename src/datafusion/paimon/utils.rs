@@ -185,29 +185,25 @@ fn batch_to_bucket(record_batch: RecordBatch) -> Result<Vec<u32>, PaimonError> {
 
     let back = row_converter.convert_rows(&rows).unwrap();
 
-
     todo!()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Arc;
-    use arrow::row::{RowConverter, SortField};
-    use arrow_array::{
-        cast::*, downcast_primitive_array, ArrayRef, Float32Array,
-    };
     use arrow::datatypes::ToByteSlice;
+    use arrow::row::{RowConverter, SortField};
+    use arrow_array::{cast::*, downcast_primitive_array, ArrayRef, Float32Array};
     #[allow(unused_imports)]
-    use arrow_array::{Array, BooleanArray, Int8Array, Int16Array, Int32Array, Int64Array};
+    use arrow_array::{Array, BooleanArray, Int16Array, Int32Array, Int64Array, Int8Array};
     use arrow_schema::{DataType, Field, Schema};
-    use bytes::{BytesMut};
+    use bytes::BytesMut;
     use parquet::data_type::AsBytes;
+    use std::sync::Arc;
 
     fn bucket(hash: i32, bucket_num: i32) -> i32 {
         (hash % bucket_num).abs()
     }
-
 
     #[test]
     fn hash_test() {
@@ -261,21 +257,21 @@ mod tests {
                             let array: Int16Array = downcast_array(array);
                             let v: i16 = array.value(0);
                             let p = v.to_byte_slice();
-                            bytes.extend_from_slice(&p);
+                            bytes.extend_from_slice(p);
                             bytes.extend(vec![0u8; 6]);
                         }
                         DataType::Int32 => {
                             let array: Int32Array = downcast_array(array);
                             let v: i32 = array.value(0);
                             let p = v.to_byte_slice();
-                            bytes.extend_from_slice(&p);
+                            bytes.extend_from_slice(p);
                             bytes.extend(vec![0u8; 4]);
                         }
                         DataType::Int64 => {
                             let array: Int64Array = downcast_array(array);
                             let v: i64 = array.value(0);
                             let p = v.to_byte_slice();
-                            bytes.extend_from_slice(&p);
+                            bytes.extend_from_slice(p);
                         }
                         DataType::Float32 => {
                             let array: Float32Array = downcast_array(array);
