@@ -30,9 +30,9 @@ LOCATION 'E:\\rustProject\\paimon-rs\\test\\paimon/default.db\\ods_mysql_paimon_
   - [x] SMALLINT
   - [x] INT
   - [x] BIGINT
-  - [ ] BOOLEAN
+  - [x] BOOLEAN
   - [ ] DOUBLE
-  - [ ] FLOAT
+  - [x] FLOAT
   - [ ] DECIMAL
   - [ ] BINARY
   - [ ] DATE
