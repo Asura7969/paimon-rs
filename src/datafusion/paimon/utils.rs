@@ -1,6 +1,12 @@
+use arrow::datatypes::ToByteSlice;
 use arrow::row::{RowConverter, SortField};
-use arrow_array::RecordBatch;
-use bytes::Bytes;
+use arrow_array::{
+    cast::*, downcast_primitive_array, ArrayRef, Float32Array, Int16Array, Int32Array, Int64Array,
+    RecordBatch,
+};
+use arrow_schema::Field;
+use bytes::{Bytes, BytesMut};
+use std::hash::Hasher;
 use std::sync::Arc;
 
 use chrono::Local;
@@ -9,6 +15,7 @@ use datafusion::arrow::datatypes::{DataType, TimeUnit};
 use crate::datafusion::paimon::error::PaimonError;
 use nom::{bytes::complete::take_until, error::ErrorKind, IResult};
 use object_store::DynObjectStore;
+use parquet::data_type::AsBytes;
 
 // https://github.com/apache/incubator-paimon/blob/master/paimon-common/src/main/java/org/apache/paimon/data/BinaryRow.java
 #[allow(unused)]
@@ -119,8 +126,34 @@ pub(crate) fn extract_num(input: &str) -> IResult<&str, (i32, Option<i32>)> {
     }
 }
 
+struct Murmur3Hasher {
+    buf: BytesMut,
+}
+
+impl Default for Murmur3Hasher {
+    fn default() -> Self {
+        Self {
+            buf: BytesMut::from_iter(&HEADER_BITS),
+        }
+    }
+}
+
+impl Hasher for Murmur3Hasher {
+    fn finish(&self) -> u64 {
+        let bytes = self.buf.clone().freeze();
+        let hash = murmur3_32(&bytes, 42) as u64;
+        // self.buf.clear();
+        hash
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        self.buf.extend_from_slice(bytes);
+    }
+}
+
+/// https://github.com/apache/incubator-paimon/blob/10540c75c99494df2dacc9589e6ed04877305ebc/paimon-common/src/main/java/org/apache/paimon/utils/MurmurHashUtils.java
 #[allow(dead_code)]
-fn murmur3_32(buf: &Bytes, seed: u32) -> u32 {
+pub(crate) fn murmur3_32(buf: &Bytes, seed: u32) -> u32 {
     fn pre_mix(buf: [u8; 4]) -> u32 {
         u32::from_le_bytes(buf)
             .wrapping_mul(0xcc9e2d51)
@@ -129,8 +162,6 @@ fn murmur3_32(buf: &Bytes, seed: u32) -> u32 {
     }
 
     let mut hash = seed;
-
-    println!("buf: {:?}", buf);
 
     let mut i = 0;
     while i < buf.len() / 4 {
@@ -188,19 +219,78 @@ fn batch_to_bucket(record_batch: RecordBatch) -> Result<Vec<u32>, PaimonError> {
     todo!()
 }
 
+#[allow(unused)]
+pub fn restore_java_mem_struct(row: Vec<ArrayRef>, fields: &Vec<Field>) -> BytesMut {
+    let mut bytes = BytesMut::from_iter(&HEADER_BITS);
+    for (array, field_type) in row.iter().zip(fields) {
+        downcast_primitive_array!(
+            array => {
+                match *field_type.data_type() {
+                    DataType::Int8 => {
+                        let v = array.value(0);
+                        bytes.extend_from_slice(v.to_byte_slice());
+                        bytes.extend(vec![0u8; 7]);
+                    }
+                    DataType::Int16 => {
+                        let array: Int16Array = downcast_array(array);
+                        let v: i16 = array.value(0);
+                        let p = v.to_byte_slice();
+                        bytes.extend_from_slice(p);
+                        bytes.extend(vec![0u8; 6]);
+                    }
+                    DataType::Int32 => {
+                        let array: Int32Array = downcast_array(array);
+                        let v: i32 = array.value(0);
+                        let p = v.to_byte_slice();
+                        bytes.extend_from_slice(p);
+                        bytes.extend(vec![0u8; 4]);
+                    }
+                    DataType::Int64 => {
+                        let array: Int64Array = downcast_array(array);
+                        let v: i64 = array.value(0);
+                        let p = v.to_byte_slice();
+                        bytes.extend_from_slice(p);
+                    }
+                    DataType::Float32 => {
+                        let array: Float32Array = downcast_array(array);
+                        let v: f32 = array.value(0);
+                        let p = v.to_bits();
+                        bytes.extend_from_slice(p.to_byte_slice());
+                        bytes.extend(vec![0u8; 4]);
+                    }
+                    DataType::Float64 => {
+                        unimplemented!()
+                    }
+                    _ => {}
+                }
+            }
+            DataType::Boolean => {
+                let v = as_boolean_array(array).value(0);
+                bytes.extend_from_slice(v.as_bytes());
+                bytes.extend(vec![0u8; 7]);
+
+            }
+            DataType::Utf8 => {
+                let v = as_string_array(array).value(0);
+                println!("{:?}", v);
+            }
+            t => println!("Unsupported datatype {}", t)
+        )
+    }
+    bytes
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrow::datatypes::ToByteSlice;
     use arrow::row::{RowConverter, SortField};
-    use arrow_array::{cast::*, downcast_primitive_array, ArrayRef, Float32Array};
+    use arrow_array::ArrayRef;
     #[allow(unused_imports)]
     use arrow_array::{Array, BooleanArray, Int16Array, Int32Array, Int64Array, Int8Array};
     use arrow_schema::{DataType, Field, Schema};
-    use bytes::BytesMut;
-    use parquet::data_type::AsBytes;
     use std::sync::Arc;
 
+    #[allow(unused)]
     fn bucket(hash: i32, bucket_num: i32) -> i32 {
         (hash % bucket_num).abs()
     }
@@ -209,14 +299,14 @@ mod tests {
     fn hash_test() {
         let fields = vec![
             Field::new("a", DataType::Int32, true),
-            // Field::new("b", DataType::Boolean, true),
+            Field::new("b", DataType::Boolean, true),
             // Field::new("c", DataType::UInt32, true),
         ];
         let schema = Arc::new(Schema::new(fields.clone()));
 
         let columns: Vec<ArrayRef> = vec![
-            Arc::new(Int32Array::from(vec![-2147483648])),
-            // Arc::new(BooleanArray::from(vec![true])),
+            Arc::new(Int32Array::from(vec![-2147483648, 1])),
+            Arc::new(BooleanArray::from(vec![true, false])),
             // Arc::new(UInt32Array::from(vec![7])),
         ];
 
@@ -230,76 +320,17 @@ mod tests {
         .unwrap();
 
         let rows = &mut row_converter.convert_columns(&columns).unwrap();
+        println!("rows size: {}", rows.num_rows());
 
         let back = row_converter.convert_rows(&*rows).unwrap();
 
         println!("back size: {}", back.len());
 
-        let bytes = restore_java_mem_struct(back, &fields);
+        // let bytes = restore_java_mem_struct(back, &fields);
 
-        let buf = bytes.freeze();
-        let b = bucket(murmur3_32(&buf, 42) as i32, 100);
-        println!("bucket: {}", b);
-    }
-
-    fn restore_java_mem_struct(row: Vec<ArrayRef>, fields: &Vec<Field>) -> BytesMut {
-        let mut bytes = BytesMut::from_iter(&HEADER_BITS);
-        for (array, field_type) in row.iter().zip(fields) {
-            downcast_primitive_array!(
-                array => {
-                    match *field_type.data_type() {
-                        DataType::Int8 => {
-                            let v = array.value(0);
-                            bytes.extend_from_slice(v.to_byte_slice());
-                            bytes.extend(vec![0u8; 7]);
-                        }
-                        DataType::Int16 => {
-                            let array: Int16Array = downcast_array(array);
-                            let v: i16 = array.value(0);
-                            let p = v.to_byte_slice();
-                            bytes.extend_from_slice(p);
-                            bytes.extend(vec![0u8; 6]);
-                        }
-                        DataType::Int32 => {
-                            let array: Int32Array = downcast_array(array);
-                            let v: i32 = array.value(0);
-                            let p = v.to_byte_slice();
-                            bytes.extend_from_slice(p);
-                            bytes.extend(vec![0u8; 4]);
-                        }
-                        DataType::Int64 => {
-                            let array: Int64Array = downcast_array(array);
-                            let v: i64 = array.value(0);
-                            let p = v.to_byte_slice();
-                            bytes.extend_from_slice(p);
-                        }
-                        DataType::Float32 => {
-                            let array: Float32Array = downcast_array(array);
-                            let v: f32 = array.value(0);
-                            let p = v.to_bits();
-                            bytes.extend_from_slice(p.to_byte_slice());
-                            bytes.extend(vec![0u8; 4]);
-                        }
-                        DataType::Float64 => {
-                            unimplemented!()
-                        }
-                        _ => {}
-                    }
-                }
-                DataType::Boolean => {
-                    let v = as_boolean_array(array).value(0);
-                    bytes.extend_from_slice(v.as_bytes());
-                    bytes.extend(vec![0u8; 7]);
-
-                }
-                DataType::Utf8 => {
-                    let v = as_string_array(array).value(0);
-                    println!("{:?}", v);
-                }
-                t => println!("Unsupported datatype {}", t)
-            )
-        }
-        bytes
+        // let buf = bytes.freeze();
+        // let b = bucket(murmur3_32(&buf, 42) as i32, 100);
+        // println!("bucket: {}", b);
     }
 
     #[test]

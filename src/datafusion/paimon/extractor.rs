@@ -2,25 +2,25 @@ use super::error::PaimonError;
 use arrow_array::RecordBatch;
 
 #[allow(dead_code)]
-pub(crate) struct KeyAndBucketExtractor {
+pub struct KeyAndBucketExtractor {
     record: Option<RecordBatch>,
     project_idx: Option<Vec<usize>>,
 }
 
 #[allow(dead_code)]
 impl KeyAndBucketExtractor {
-    pub(crate) fn new(indices: Option<Vec<usize>>) -> KeyAndBucketExtractor {
+    pub fn new(indices: Option<Vec<usize>>) -> KeyAndBucketExtractor {
         Self {
             record: None,
             project_idx: indices,
         }
     }
 
-    pub(crate) fn set_record(&mut self, record: RecordBatch) {
+    pub fn set_record(&mut self, record: RecordBatch) {
         self.record = Some(record);
     }
 
-    pub(crate) fn bucket(&self) -> Result<i32, PaimonError> {
+    pub fn bucket(&self) -> Result<i32, PaimonError> {
         match &self.record {
             Some(batch) => {
                 if let Some(idx) = &self.project_idx {
@@ -39,8 +39,5 @@ impl KeyAndBucketExtractor {
     }
 }
 
-
 #[cfg(test)]
-mod tests {
-
-}
+mod tests {}
