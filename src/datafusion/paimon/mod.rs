@@ -12,6 +12,7 @@ use self::{error::PaimonError, manifest_list::ManifestFileMeta, reader::FileForm
 pub mod consumer;
 pub mod error;
 mod exec;
+mod extractor;
 mod json_util;
 pub mod manifest;
 pub mod manifest_list;
