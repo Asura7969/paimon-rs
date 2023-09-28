@@ -21,6 +21,8 @@ LOCATION 'E:\\rustProject\\paimon-rs\\test\\paimon/default.db\\ods_mysql_paimon_
 - [x] 批读实现**limit**(可优化)
 - [x] 本地`paimon`表读取
 - [x] 支持`hdfs`数据源(未测试)
+- [x] 支持指定`tag`读取数据(未测试)
+- [x] 支持指定`consumer-id`读取数据(未测试)
 
 ## Doing
 
@@ -41,8 +43,7 @@ LOCATION 'E:\\rustProject\\paimon-rs\\test\\paimon/default.db\\ods_mysql_paimon_
 
 ## RoadMap
 
-- [ ] 集成`incubator-opendal`
 - [ ] 支持`Appendonly`表读取数据
 - [ ] 支持流读
-- [ ] 支持`tag`功能
 - [ ] 支持写功能
+- [ ] 集成`incubator-opendal`

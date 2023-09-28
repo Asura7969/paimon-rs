@@ -9,8 +9,10 @@ use std::{collections::HashMap, env, path::Path, sync::Arc};
 
 use self::{error::PaimonError, manifest_list::ManifestFileMeta, reader::FileFormat, utils::from};
 
+pub mod consumer;
 pub mod error;
 mod exec;
+mod extractor;
 mod json_util;
 pub mod manifest;
 pub mod manifest_list;

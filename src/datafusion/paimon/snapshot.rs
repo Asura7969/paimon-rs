@@ -6,8 +6,8 @@ use object_store::{path::Path, DynObjectStore};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    error::PaimonError, manifest_list::ManifestFileMeta, reader::manifest_list, CommitKind,
-    PaimonSchema,
+    consumer::Consumer, error::PaimonError, manifest_list::ManifestFileMeta, reader::manifest_list,
+    CommitKind, PaimonSchema,
 };
 use crate::datafusion::paimon::{manifest::ManifestEntry, utils::read_to_string};
 
@@ -15,6 +15,8 @@ use crate::datafusion::paimon::{manifest::ManifestEntry, utils::read_to_string};
 const SNAPSHOT_PREFIX: &str = "snapshot-";
 #[allow(dead_code)]
 const TAG_PREFIX: &str = "tag-";
+#[allow(dead_code)]
+const CONSUMER_PREFIX: &str = "consumer-";
 #[allow(dead_code)]
 const EARLIEST: &str = "EARLIEST";
 const LATEST: &str = "LATEST";
@@ -164,6 +166,10 @@ impl SnapshotManager {
         format!("/tag/{}{}", TAG_PREFIX, tag_name)
     }
 
+    fn consumer_path(&self, consumer_id: i64) -> String {
+        format!("/consumer/{}{}", CONSUMER_PREFIX, consumer_id)
+    }
+
     pub(crate) async fn snapshot(&self, snapshot_id: i64) -> Result<Snapshot, PaimonError> {
         let path = self.snapshot_path(snapshot_id);
         let content = read_to_string(&self.storage, &Path::from(path)).await?;
@@ -178,6 +184,14 @@ impl SnapshotManager {
         Ok(s)
     }
 
+    pub(crate) async fn consumer(&self, consumer_id: i64) -> Result<Snapshot, PaimonError> {
+        let path = self.consumer_path(consumer_id);
+        let content = read_to_string(&self.storage, &Path::from(path)).await?;
+        let consumer: Consumer = Consumer::from_json(&content)?;
+        let s: Snapshot = self.snapshot(consumer.next_snapshot).await?;
+        Ok(s)
+    }
+
     async fn latest_snapshot_id(&self) -> Option<i64> {
         let latest_path = format!("/snapshot/{}", LATEST);
         let id_string = read_to_string(&self.storage, &Path::from(latest_path))
@@ -189,14 +203,13 @@ impl SnapshotManager {
         }
     }
 
-    pub(crate) async fn latest_snapshot(&self) -> Option<Snapshot> {
+    pub(crate) async fn latest_snapshot(&self) -> Result<Snapshot, PaimonError> {
         if let Some(id) = self.latest_snapshot_id().await {
-            match self.snapshot(id).await {
-                core::result::Result::Ok(s) => Some(s),
-                Err(_) => None,
-            }
+            self.snapshot(id).await
         } else {
-            None
+            Err(PaimonError::Generic(
+                "Not found latest snapshot id".to_string(),
+            ))
         }
     }
 }
