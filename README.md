@@ -33,7 +33,7 @@ LOCATION 'E:\\rustProject\\paimon-rs\\test\\paimon/default.db\\ods_mysql_paimon_
   - [x] INT
   - [x] BIGINT
   - [x] BOOLEAN
-  - [ ] DOUBLE
+  - [x] DOUBLE
   - [x] FLOAT
   - [ ] DECIMAL
   - [ ] BINARY

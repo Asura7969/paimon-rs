@@ -1,8 +1,8 @@
 use arrow::datatypes::ToByteSlice;
 use arrow::row::{RowConverter, SortField};
 use arrow_array::{
-    cast::*, downcast_primitive_array, ArrayRef, Float32Array, Int16Array, Int32Array, Int64Array,
-    RecordBatch,
+    cast::*, downcast_primitive_array, ArrayRef, Float32Array, Float64Array, Int16Array,
+    Int32Array, Int64Array, RecordBatch,
 };
 use arrow_schema::Field;
 use bytes::{Bytes, BytesMut};
@@ -259,7 +259,10 @@ pub fn restore_java_mem_struct(row: Vec<ArrayRef>, fields: &Vec<Field>) -> Bytes
                         bytes.extend(vec![0u8; 4]);
                     }
                     DataType::Float64 => {
-                        unimplemented!()
+                        let array: Float64Array = downcast_array(array);
+                        let v: f64 = array.value(0);
+                        let p = v.to_bits();
+                        bytes.extend_from_slice(p.to_byte_slice());
                     }
                     _ => {}
                 }
@@ -298,15 +301,15 @@ mod tests {
     #[test]
     fn hash_test() {
         let fields = vec![
-            Field::new("a", DataType::Int32, true),
-            Field::new("b", DataType::Boolean, true),
+            Field::new("a", DataType::Float64, true),
+            // Field::new("b", DataType::Boolean, true),
             // Field::new("c", DataType::UInt32, true),
         ];
         let schema = Arc::new(Schema::new(fields.clone()));
 
         let columns: Vec<ArrayRef> = vec![
-            Arc::new(Int32Array::from(vec![-2147483648, 1])),
-            Arc::new(BooleanArray::from(vec![true, false])),
+            Arc::new(Float64Array::from(vec![5.55])),
+            // Arc::new(BooleanArray::from(vec![true, false])),
             // Arc::new(UInt32Array::from(vec![7])),
         ];
 
@@ -326,11 +329,11 @@ mod tests {
 
         println!("back size: {}", back.len());
 
-        // let bytes = restore_java_mem_struct(back, &fields);
+        let bytes = restore_java_mem_struct(back, &fields);
 
-        // let buf = bytes.freeze();
-        // let b = bucket(murmur3_32(&buf, 42) as i32, 100);
-        // println!("bucket: {}", b);
+        let buf = bytes.freeze();
+        let b = bucket(murmur3_32(&buf, 42) as i32, 100);
+        println!("bucket: {}", b);
     }
 
     #[test]
