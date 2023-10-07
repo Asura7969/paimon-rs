@@ -141,9 +141,9 @@ impl Default for Murmur3Hasher {
 impl Hasher for Murmur3Hasher {
     fn finish(&self) -> u64 {
         let bytes = self.buf.clone().freeze();
-        let hash = murmur3_32(&bytes, 42) as u64;
+
         // self.buf.clear();
-        hash
+        murmur3_32(&bytes, 42) as u64
     }
 
     fn write(&mut self, bytes: &[u8]) {
@@ -291,7 +291,22 @@ mod tests {
     #[allow(unused_imports)]
     use arrow_array::{Array, BooleanArray, Int16Array, Int32Array, Int64Array, Int8Array};
     use arrow_schema::{DataType, Field, Schema};
+    use num_bigint::BigInt;
+    use num_traits::ToBytes;
     use std::sync::Arc;
+
+    #[test]
+    fn test_to_signed_bytes_le() {
+        fn check(s: &str, _result: Vec<u8>) {
+            let b = BigInt::parse_bytes(s.as_bytes(), 10).unwrap();
+            let c = b.to_signed_bytes_le();
+            // let c = <BigInt as ToBytes>::to_le_bytes(&b);
+            println!("c: {:?}", c);
+        }
+
+        check("555", vec![2, 43]);
+        // check("-555", vec![0xff, 0x7f]);
+    }
 
     #[allow(unused)]
     fn bucket(hash: i32, bucket_num: i32) -> i32 {

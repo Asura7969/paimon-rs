@@ -62,6 +62,7 @@ ahash = "0.8.3"
 url = "2.4.0"
 
 num-traits = { version = "0.2"}
+num-bigint = "0.4.4"
 
 [features]
 hdfs = ["datafusion-objectstore-hdfs"]
