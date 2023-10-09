@@ -1,8 +1,8 @@
 use arrow::datatypes::ToByteSlice;
 use arrow::row::{RowConverter, SortField};
 use arrow_array::{
-    cast::*, downcast_primitive_array, ArrayRef, Float32Array, Float64Array, Int16Array,
-    Int32Array, Int64Array, RecordBatch,
+    cast::*, downcast_primitive_array, ArrayRef, Decimal128Array, Float32Array, Float64Array,
+    Int16Array, Int32Array, Int64Array, RecordBatch,
 };
 use arrow_schema::Field;
 use bytes::{Bytes, BytesMut};
@@ -55,7 +55,7 @@ pub(crate) fn from(value: &str) -> (DataType, bool) {
         "INT" | "INTEGER" => DataType::Int32,
         "BIGINT" => DataType::Int64,
         "FLOAT" | "REAL" => DataType::Float32,
-        "DECIMAL" => DataType::Decimal256(tuple2.0 as u8, tuple2.1.map_or(i8::MAX, |v| v as i8)),
+        "DECIMAL" => DataType::Decimal128(tuple2.0 as u8, tuple2.1.map_or(i8::MAX, |v| v as i8)),
         "BOOLEAN" => DataType::Boolean,
         "DOUBLE" => DataType::Float64,
         "VARBINARY" | "BYTES" | "BINARY" => DataType::Binary,
@@ -264,6 +264,17 @@ pub fn restore_java_mem_struct(row: Vec<ArrayRef>, fields: &Vec<Field>) -> Bytes
                         let p = v.to_bits();
                         bytes.extend_from_slice(p.to_byte_slice());
                     }
+                    DataType::Decimal128(precision, scale) => {
+                        let array: Decimal128Array = downcast_array(array);
+                        let v: i128 = array.value(0);
+                        let oo = v.to_byte_slice();
+                        println!("oo: {:?}", oo);
+                        let aa: BytesMut = BytesMut::from_iter(oo);
+                        let (head, tail) = aa.split_at(8);
+                        bytes.clear();
+                        bytes.extend_from_slice(tail);
+                        bytes.extend_from_slice(head);
+                    }
                     _ => {}
                 }
             }
@@ -292,14 +303,24 @@ mod tests {
     use arrow_array::{Array, BooleanArray, Int16Array, Int32Array, Int64Array, Int8Array};
     use arrow_schema::{DataType, Field, Schema};
     use num_bigint::BigInt;
-    use num_traits::ToBytes;
     use std::sync::Arc;
 
     #[test]
     fn test_to_signed_bytes_le() {
         fn check(s: &str, _result: Vec<u8>) {
             let b = BigInt::parse_bytes(s.as_bytes(), 10).unwrap();
-            let c = b.to_signed_bytes_le();
+            let mut c = b.to_signed_bytes_le();
+            let field_count = 3_i64;
+            let null_bits_size_in_bytes = ((field_count + 63 + 8) / 64) * 8;
+            let cursor = null_bits_size_in_bytes + 8 * field_count;
+            let t = cursor << 32 | c.len() as i64;
+            println!("t: {:?}", t);
+
+            let d = t.to_le_bytes();
+            println!("d: {:?}", d);
+
+            c.reverse();
+            c.resize(16, 0);
             // let c = <BigInt as ToBytes>::to_le_bytes(&b);
             println!("c: {:?}", c);
         }
@@ -316,14 +337,18 @@ mod tests {
     #[test]
     fn hash_test() {
         let fields = vec![
-            Field::new("a", DataType::Float64, true),
+            Field::new("a", DataType::Decimal128(20, 2), true),
             // Field::new("b", DataType::Boolean, true),
             // Field::new("c", DataType::UInt32, true),
         ];
         let schema = Arc::new(Schema::new(fields.clone()));
 
+        let arr = Decimal128Array::from_iter_values([555])
+            .with_precision_and_scale(20, 2)
+            .unwrap();
+
         let columns: Vec<ArrayRef> = vec![
-            Arc::new(Float64Array::from(vec![5.55])),
+            Arc::new(arr.clone()),
             // Arc::new(BooleanArray::from(vec![true, false])),
             // Arc::new(UInt32Array::from(vec![7])),
         ];
@@ -349,6 +374,9 @@ mod tests {
         let buf = bytes.freeze();
         let b = bucket(murmur3_32(&buf, 42) as i32, 100);
         println!("bucket: {}", b);
+
+        let o = arr.value(0);
+        let _oo = o.to_byte_slice();
     }
 
     #[test]
