@@ -42,13 +42,13 @@ tower = "0.4"
 # Datafusion
 # datafusion = { version = "28.0.0", features = ["avro", "apache-avro", "crypto_expressions"]}
 # datafusion-common = { version = "28.0.0", features = ["avro", "apache-avro", "parquet", "object_store"]}
-datafusion = { git = "https://github.com/Asura7969/arrow-datafusion", features = ["avro", "apache-avro"], rev = "cd16f1e"}
-datafusion-common = { git = "https://github.com/Asura7969/arrow-datafusion", features = ["avro", "apache-avro", "parquet", "object_store"], rev = "cd16f1e"}
-datafusion-execution = { git = "https://github.com/Asura7969/arrow-datafusion", rev = "cd16f1e" }
-datafusion-expr = { git = "https://github.com/Asura7969/arrow-datafusion", rev = "cd16f1e" }
-datafusion-optimizer = { git = "https://github.com/Asura7969/arrow-datafusion", rev = "cd16f1e" }
-datafusion-sql = { git = "https://github.com/Asura7969/arrow-datafusion", rev = "cd16f1e" }
-datafusion-cli = { git = "https://github.com/Asura7969/arrow-datafusion", rev = "cd16f1e" }
+datafusion = { git = "https://github.com/Asura7969/arrow-datafusion", features = ["avro", "apache-avro"], rev = "8e3b235"}
+datafusion-common = { git = "https://github.com/Asura7969/arrow-datafusion", features = ["avro", "apache-avro", "parquet", "object_store"], rev = "8e3b235"}
+datafusion-execution = { git = "https://github.com/Asura7969/arrow-datafusion", rev = "8e3b235" }
+datafusion-expr = { git = "https://github.com/Asura7969/arrow-datafusion", rev = "8e3b235" }
+datafusion-optimizer = { git = "https://github.com/Asura7969/arrow-datafusion", rev = "8e3b235" }
+datafusion-sql = { git = "https://github.com/Asura7969/arrow-datafusion", rev = "8e3b235" }
+datafusion-cli = { git = "https://github.com/Asura7969/arrow-datafusion", rev = "8e3b235" }
 datafusion-objectstore-hdfs = { version = "0.1.4", default-features = false, features = [
     "hdfs3",
     "try_spawn_blocking",
